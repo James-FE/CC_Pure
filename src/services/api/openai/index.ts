@@ -17,10 +17,7 @@ import { adaptOpenAIStreamToAnthropic } from './streamAdapter.js'
 import { resolveOpenAIModel } from './modelMapping.js'
 import { normalizeMessagesForAPI } from '../../../utils/messages.js'
 import { toolToAPISchema } from '../../../utils/api.js'
-import {
-  getEmptyToolPermissionContext,
-  toolMatchesName,
-} from '../../../Tool.js'
+import { getEmptyToolPermissionContext } from '../../../Tool.js'
 import { logForDebugging } from '../../../utils/debug.js'
 import { addToTotalSessionCost } from '../../../cost-tracker.js'
 import { calculateUSDCost } from '../../../utils/modelCost.js'
@@ -30,14 +27,6 @@ import {
   createAssistantAPIErrorMessage,
   normalizeContentFromAPI,
 } from '../../../utils/messages.js'
-import {
-  isToolSearchEnabled,
-  extractDiscoveredToolNames,
-} from '../../../utils/toolSearch.js'
-import {
-  isDeferredTool,
-  TOOL_SEARCH_TOOL_NAME,
-} from '../../../tools/ToolSearchTool/prompt.js'
 
 /**
  * OpenAI-compatible query path. Converts Anthropic-format messages/tools to
@@ -62,54 +51,19 @@ export async function* queryModelOpenAI(
     // 2. Normalize messages using shared preprocessing
     const messagesForAPI = normalizeMessagesForAPI(messages, tools)
 
-    // 3. Check if tool search is enabled (similar to Anthropic path)
-    const useToolSearch = await isToolSearchEnabled(
-      options.model,
-      tools,
-      options.getToolPermissionContext ||
-        (async () => getEmptyToolPermissionContext()),
-      options.agents || [],
-      options.querySource,
-    )
-
-    // 4. Build deferred tools set (similar to Anthropic path)
-    const deferredToolNames = new Set<string>()
-    if (useToolSearch) {
-      for (const t of tools) {
-        if (isDeferredTool(t)) deferredToolNames.add(t.name)
-      }
-    }
-
-    // 5. Filter tools (similar to Anthropic path)
-    let filteredTools = tools
-    if (useToolSearch && deferredToolNames.size > 0) {
-      const discoveredToolNames = extractDiscoveredToolNames(messages)
-
-      filteredTools = tools.filter(tool => {
-        // Always include non-deferred tools
-        if (!deferredToolNames.has(tool.name)) return true
-        // Always include ToolSearchTool (so it can discover more tools)
-        if (toolMatchesName(tool, TOOL_SEARCH_TOOL_NAME)) return true
-        // Only include deferred tools that have been discovered
-        return discoveredToolNames.has(tool.name)
-      })
-    }
-
-    // 6. Build tool schemas with deferLoading flag
+    // 3. Build tool schemas
     const toolSchemas = await Promise.all(
-      filteredTools.map(tool =>
+      tools.map(tool =>
         toolToAPISchema(tool, {
           getToolPermissionContext: options.getToolPermissionContext,
           tools,
           agents: options.agents,
           allowedAgentTypes: options.allowedAgentTypes,
           model: options.model,
-          deferLoading: useToolSearch && deferredToolNames.has(tool.name),
         }),
       ),
     )
-
-    // 7. Filter out non-standard tools (server tools like advisor)
+    // Filter out non-standard tools (server tools like advisor)
     const standardTools = toolSchemas.filter(
       (t): t is BetaToolUnion & { type: string } => {
         const anyT = t as Record<string, unknown>
@@ -119,7 +73,7 @@ export async function* queryModelOpenAI(
       },
     )
 
-    // 8. Convert messages and tools to OpenAI format
+    // 4. Convert messages and tools to OpenAI format
     const openaiMessages = anthropicMessagesToOpenAI(
       messagesForAPI,
       systemPrompt,
@@ -127,21 +81,7 @@ export async function* queryModelOpenAI(
     const openaiTools = anthropicToolsToOpenAI(standardTools)
     const openaiToolChoice = anthropicToolChoiceToOpenAI(options.toolChoice)
 
-    // 9. Log tool filtering details
-    if (useToolSearch) {
-      const includedDeferredTools = filteredTools.filter(t =>
-        deferredToolNames.has(t.name),
-      ).length
-      logForDebugging(
-        `[OpenAI] Tool search enabled: ${includedDeferredTools}/${deferredToolNames.size} deferred tools included, total tools=${openaiTools.length}`,
-      )
-    } else {
-      logForDebugging(
-        `[OpenAI] Tool search disabled, total tools=${openaiTools.length}`,
-      )
-    }
-
-    // 10. Get client and make streaming request
+    // 5. Get client and make streaming request
     const client = getOpenAIClient({
       maxRetries: 0,
       fetchOverride: options.fetchOverride,
@@ -152,7 +92,7 @@ export async function* queryModelOpenAI(
       `[OpenAI] Calling model=${openaiModel}, messages=${openaiMessages.length}, tools=${openaiTools.length}`,
     )
 
-    // 11. Call OpenAI API with streaming
+    // 6. Call OpenAI API with streaming
     const stream = await client.chat.completions.create(
       {
         model: openaiModel,
