@@ -6,13 +6,7 @@ import type {
   SystemAPIErrorMessage,
   AssistantMessage,
 } from '../../../types/message.js'
-import type { AgentId } from '../../../types/ids.js'
 import type { Tools } from '../../../Tool.js'
-import type { Stream } from 'openai/streaming.mjs'
-import type {
-  ChatCompletionChunk,
-  ChatCompletionCreateParamsStreaming,
-} from 'openai/resources/chat/completions/completions.mjs'
 import { getOpenAIClient } from './client.js'
 import { anthropicMessagesToOpenAI } from './convertMessages.js'
 import {
@@ -30,14 +24,12 @@ import {
 import { logForDebugging } from '../../../utils/debug.js'
 import { addToTotalSessionCost } from '../../../cost-tracker.js'
 import { calculateUSDCost } from '../../../utils/modelCost.js'
-import { isEnvTruthy, isEnvDefinedFalsy } from '../../../utils/envUtils.js'
 import type { Options } from '../claude.js'
 import { randomUUID } from 'crypto'
 import {
   createAssistantAPIErrorMessage,
   normalizeContentFromAPI,
 } from '../../../utils/messages.js'
-import type { SDKAssistantMessageError } from '../../../entrypoints/agentSdkTypes.js'
 import {
   isToolSearchEnabled,
   extractDiscoveredToolNames,
@@ -46,86 +38,6 @@ import {
   isDeferredTool,
   TOOL_SEARCH_TOOL_NAME,
 } from '../../../tools/ToolSearchTool/prompt.js'
-import { recordLLMObservation } from '../../../services/langfuse/tracing.js'
-import {
-  convertMessagesToLangfuse,
-  convertOutputToLangfuse,
-  convertToolsToLangfuse,
-} from '../../../services/langfuse/convert.js'
-
-/**
- * Detect whether DeepSeek-style thinking mode should be enabled.
- *
- * Enabled when:
- * 1. OPENAI_ENABLE_THINKING=1 is set (explicit enable), OR
- * 2. Model name contains "deepseek-reasoner" OR "DeepSeek-V3.2" (auto-detect, case-insensitive)
- *
- * Disabled when:
- * - OPENAI_ENABLE_THINKING=0/false/no/off is explicitly set (overrides model detection)
- *
- * @param model - The resolved OpenAI model name
- * @internal Exported for testing purposes only
- */
-export function isOpenAIThinkingEnabled(model: string): boolean {
-  // Explicit disable takes priority (overrides model auto-detect)
-  if (isEnvDefinedFalsy(process.env.OPENAI_ENABLE_THINKING)) return false
-  // Explicit enable
-  if (isEnvTruthy(process.env.OPENAI_ENABLE_THINKING)) return true
-  // Auto-detect from model name (deepseek-reasoner and DeepSeek-V3.2 support thinking mode)
-  const modelLower = model.toLowerCase()
-  return modelLower.includes('deepseek-reasoner') || modelLower.includes('deepseek-v3.2')
-}
-
-/**
- * Build the request body for OpenAI chat.completions.create().
- * Extracted for testability — the thinking mode params are injected here.
- *
- * DeepSeek thinking mode: inject thinking params via request body.
- * Two formats are added simultaneously to support different deployments:
- * - Official DeepSeek API: `thinking: { type: 'enabled' }`
- * - Self-hosted DeepSeek-V3.2: `enable_thinking: true` + `chat_template_kwargs: { thinking: true }`
- * OpenAI SDK passes unknown keys through to the HTTP body.
- * Each endpoint will use the format it recognizes and ignore the others.
- * @internal Exported for testing purposes only
- */
-export function buildOpenAIRequestBody(params: {
-  model: string
-  messages: any[]
-  tools: any[]
-  toolChoice: any
-  enableThinking: boolean
-  temperatureOverride?: number
-}): ChatCompletionCreateParamsStreaming & {
-  thinking?: { type: string }
-  enable_thinking?: boolean
-  chat_template_kwargs?: { thinking: boolean }
-} {
-  const { model, messages, tools, toolChoice, enableThinking, temperatureOverride } = params
-  return {
-    model,
-    messages,
-    ...(tools.length > 0 && {
-      tools,
-      ...(toolChoice && { tool_choice: toolChoice }),
-    }),
-    stream: true,
-    stream_options: { include_usage: true },
-    // DeepSeek thinking mode: enable chain-of-thought output.
-    // When active, temperature/top_p/presence_penalty/frequency_penalty are ignored by DeepSeek.
-    ...(enableThinking && {
-      // Official DeepSeek API format
-      thinking: { type: 'enabled' },
-      // Self-hosted DeepSeek-V3.2 format
-      enable_thinking: true,
-      chat_template_kwargs: { thinking: true },
-    }),
-    // Only send temperature when thinking mode is off (DeepSeek ignores it anyway,
-    // but other providers may respect it)
-    ...(!enableThinking && temperatureOverride !== undefined && {
-      temperature: temperatureOverride,
-    }),
-  }
-}
 
 /**
  * OpenAI-compatible query path. Converts Anthropic-format messages/tools to
@@ -200,7 +112,7 @@ export async function* queryModelOpenAI(
     // 7. Filter out non-standard tools (server tools like advisor)
     const standardTools = toolSchemas.filter(
       (t): t is BetaToolUnion & { type: string } => {
-        const anyT = t as unknown as Record<string, unknown>
+        const anyT = t as Record<string, unknown>
         return (
           anyT.type !== 'advisor_20260301' && anyT.type !== 'computer_20250124'
         )
@@ -208,10 +120,10 @@ export async function* queryModelOpenAI(
     )
 
     // 8. Convert messages and tools to OpenAI format
-    const enableThinking = isOpenAIThinkingEnabled(openaiModel)
-    const openaiMessages = anthropicMessagesToOpenAI(messagesForAPI, systemPrompt, {
-      enableThinking,
-    })
+    const openaiMessages = anthropicMessagesToOpenAI(
+      messagesForAPI,
+      systemPrompt,
+    )
     const openaiTools = anthropicToolsToOpenAI(standardTools)
     const openaiToolChoice = anthropicToolChoiceToOpenAI(options.toolChoice)
 
@@ -232,30 +144,36 @@ export async function* queryModelOpenAI(
     // 10. Get client and make streaming request
     const client = getOpenAIClient({
       maxRetries: 0,
-      fetchOverride: options.fetchOverride as unknown as typeof fetch,
+      fetchOverride: options.fetchOverride,
       source: options.querySource,
     })
 
     logForDebugging(
-      `[OpenAI] Calling model=${openaiModel}, messages=${openaiMessages.length}, tools=${openaiTools.length}, thinking=${enableThinking}`,
+      `[OpenAI] Calling model=${openaiModel}, messages=${openaiMessages.length}, tools=${openaiTools.length}`,
     )
 
     // 11. Call OpenAI API with streaming
-    const requestBody = buildOpenAIRequestBody({
-      model: openaiModel,
-      messages: openaiMessages,
-      tools: openaiTools,
-      toolChoice: openaiToolChoice,
-      enableThinking,
-      temperatureOverride: options.temperatureOverride,
-    })
     const stream = await client.chat.completions.create(
-      requestBody,
-      { signal },
+      {
+        model: openaiModel,
+        messages: openaiMessages,
+        ...(openaiTools.length > 0 && {
+          tools: openaiTools,
+          ...(openaiToolChoice && { tool_choice: openaiToolChoice }),
+        }),
+        stream: true,
+        stream_options: { include_usage: true },
+        ...(options.temperatureOverride !== undefined && {
+          temperature: options.temperatureOverride,
+        }),
+      },
+      {
+        signal,
+      },
     )
 
-    // 12. Convert OpenAI stream to Anthropic events, then process into
-    //     AssistantMessage + StreamEvent (matching the Anthropic path behavior)
+    // 7. Convert OpenAI stream to Anthropic events, then process into
+    //    AssistantMessage + StreamEvent (matching the Anthropic path behavior)
     const adaptedStream = adaptOpenAIStreamToAnthropic(stream, openaiModel)
 
     // Accumulate content blocks and usage, same as the Anthropic path in claude.ts
@@ -269,7 +187,6 @@ export async function* queryModelOpenAI(
     }
     let ttftMs = 0
     const start = Date.now()
-    const collectedMessages: AssistantMessage[] = []
 
     for await (const event of adaptedStream) {
       switch (event.type) {
@@ -329,7 +246,6 @@ export async function* queryModelOpenAI(
             uuid: randomUUID(),
             timestamp: new Date().toISOString(),
           }
-          collectedMessages.push(m)
           yield m
           break
         }
@@ -362,32 +278,13 @@ export async function* queryModelOpenAI(
         ...(event.type === 'message_start' ? { ttftMs } : undefined),
       } as StreamEvent
     }
-
-    // Record LLM observation in Langfuse (no-op if not configured).
-    recordLLMObservation(options.langfuseTrace ?? null, {
-      model: openaiModel,
-      provider: 'openai',
-      input: convertMessagesToLangfuse(openaiMessages),
-      output: convertOutputToLangfuse(collectedMessages),
-      usage: {
-        input_tokens: usage.input_tokens,
-        output_tokens: usage.output_tokens,
-        cache_creation_input_tokens: usage.cache_creation_input_tokens,
-        cache_read_input_tokens: usage.cache_read_input_tokens,
-      },
-      startTime: new Date(start),
-      endTime: new Date(),
-      completionStartTime: ttftMs > 0 ? new Date(start + ttftMs) : undefined,
-      tools: convertToolsToLangfuse(toolSchemas as unknown[]),
-      ...(enableThinking && { thinking: { type: 'enabled' } }),
-    })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     logForDebugging(`[OpenAI] Error: ${errorMessage}`, { level: 'error' })
     yield createAssistantAPIErrorMessage({
       content: `API Error: ${errorMessage}`,
       apiError: 'api_error',
-      error: (error instanceof Error ? error : new Error(String(error))) as unknown as SDKAssistantMessageError,
+      error: error instanceof Error ? error : new Error(String(error)),
     })
   }
 }
