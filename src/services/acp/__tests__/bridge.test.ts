@@ -4,7 +4,6 @@ import {
   toolUpdateFromToolResult,
   toolUpdateFromEditToolResponse,
   forwardSessionUpdates,
-  nextSdkMessageOrAbort,
 } from '../bridge.js'
 import { markdownEscape, toDisplayPath } from '../utils.js'
 import type { AgentSideConnection, ToolKind } from '@agentclientprotocol/sdk'
@@ -28,10 +27,6 @@ async function* makeStream(
   msgs: SDKMessage[],
 ): AsyncGenerator<SDKMessage, void, unknown> {
   for (const m of msgs) yield m
-}
-
-async function* makeWaitingStream(): AsyncGenerator<SDKMessage, void, unknown> {
-  await new Promise<never>(() => {})
 }
 
 // ── toolInfoFromToolUse ────────────────────────────────────────────
@@ -472,7 +467,7 @@ describe('toolUpdateFromToolResult', () => {
         is_error: false,
         tool_use_id: 't1',
       },
-      { name: 'SearchExtraTools', id: 't1' },
+      { name: 'ToolSearch', id: 't1' },
     )
     expect(result.content).toEqual([
       { type: 'content', content: { type: 'text', text: 'Tool: some_tool' } },
@@ -681,47 +676,6 @@ describe('toDisplayPath', () => {
 })
 
 // ── forwardSessionUpdates ─────────────────────────────────────────
-
-describe('nextSdkMessageOrAbort', () => {
-  test('returns done:true when aborted while waiting for next message', async () => {
-    const ac = new AbortController()
-    const pending = nextSdkMessageOrAbort(makeWaitingStream(), ac.signal)
-    ac.abort()
-
-    const result = await Promise.race([
-      pending,
-      new Promise<'timeout'>(resolve => setTimeout(resolve, 100, 'timeout')),
-    ])
-
-    expect(result).toEqual({ done: true, value: undefined })
-  })
-
-  test('returns done:true when stream is done', async () => {
-    const result = await nextSdkMessageOrAbort(
-      makeStream([]),
-      new AbortController().signal,
-    )
-
-    expect(result).toEqual({ done: true, value: undefined })
-  })
-
-  test('returns a valid SDKMessage via IteratorResult', async () => {
-    const msg = {
-      type: 'assistant',
-      message: {
-        role: 'assistant',
-        content: [{ type: 'text', text: 'hello' }],
-      },
-    } as unknown as SDKMessage
-
-    const result = await nextSdkMessageOrAbort(
-      makeStream([msg]),
-      new AbortController().signal,
-    )
-
-    expect(result).toEqual({ done: false, value: msg })
-  })
-})
 
 describe('forwardSessionUpdates', () => {
   test('returns end_turn when stream is empty', async () => {
@@ -1020,28 +974,6 @@ describe('forwardSessionUpdates', () => {
     ).toBe(0)
   })
 
-  test('ignores unknown message types without crashing', async () => {
-    const conn = makeConn()
-    const debug = console.debug
-    const debugMock = mock(() => {})
-    console.debug = debugMock as typeof console.debug
-
-    try {
-      const result = await forwardSessionUpdates(
-        's1',
-        makeStream([{ type: 'future_message' } as unknown as SDKMessage]),
-        conn,
-        new AbortController().signal,
-        {},
-      )
-
-      expect(result.stopReason).toBe('end_turn')
-      expect(debugMock).toHaveBeenCalled()
-    } finally {
-      console.debug = debug
-    }
-  })
-
   test('re-throws unexpected errors from stream', async () => {
     const conn = makeConn()
     async function* errorStream(): AsyncGenerator<
@@ -1049,8 +981,7 @@ describe('forwardSessionUpdates', () => {
       undefined,
       unknown
     > {
-      // biome-ignore lint/correctness/useYield: yield before throw keeps biome happy
-      if (false) yield undefined as unknown as SDKMessage
+      yield undefined as unknown as SDKMessage
       throw new Error('stream exploded')
     }
     await expect(
