@@ -352,7 +352,6 @@ export default class Ink {
       }
     }
 
-    // @ts-ignore createContainer arg count varies across react-reconciler versions
     this.container = reconciler.createContainer(
       this.rootNode,
       ConcurrentRoot,
@@ -952,9 +951,8 @@ export default class Ink {
 
   pause(): void {
     // Flush pending React updates and render before pausing.
-    // @ts-ignore flushSyncFromReconciler exists in react-reconciler but not in @types
-    reconciler.flushSyncFromReconciler()
-    this.onRender()
+    reconciler.flushSyncFromReconciler();
+    this.onRender();
 
     this.isPaused = true
   }
@@ -1701,10 +1699,8 @@ export default class Ink {
       </App>
     )
 
-    // @ts-ignore updateContainerSync exists in react-reconciler but not in @types
-    reconciler.updateContainerSync(tree, this.container, null, noop)
-    // @ts-ignore flushSyncWork exists in react-reconciler but not in @types
-    reconciler.flushSyncWork()
+    reconciler.updateContainerSync(tree, this.container, null, noop);
+    reconciler.flushSyncWork();
   }
 
   unmount(error?: Error | number | null): void {
@@ -1773,11 +1769,9 @@ export default class Ink {
       this.drainTimer = null
     }
 
-    // @ts-ignore updateContainerSync exists in react-reconciler but not in @types
-    reconciler.updateContainerSync(null, this.container, null, noop)
-    // @ts-ignore flushSyncWork exists in react-reconciler but not in @types
-    reconciler.flushSyncWork()
-    instances.delete(this.options.stdout)
+    reconciler.updateContainerSync(null, this.container, null, noop);
+    reconciler.flushSyncWork();
+    instances.delete(this.options.stdout);
 
     // Free the root yoga node, then clear its reference. Children are already
     // freed by the reconciler's removeChildFromContainer; using .free() (not
