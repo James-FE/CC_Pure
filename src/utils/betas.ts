@@ -16,14 +16,14 @@ import {
   REDACT_THINKING_BETA_HEADER,
   STRUCTURED_OUTPUTS_BETA_HEADER,
   TOKEN_EFFICIENT_TOOLS_BETA_HEADER,
-  SEARCH_EXTRA_TOOLS_BETA_HEADER_1P,
-  SEARCH_EXTRA_TOOLS_BETA_HEADER_3P,
+  TOOL_SEARCH_BETA_HEADER_1P,
+  TOOL_SEARCH_BETA_HEADER_3P,
   WEB_SEARCH_BETA_HEADER,
 } from '../constants/betas.js'
 import { OAUTH_BETA_HEADER } from '../constants/oauth.js'
 import { isClaudeAISubscriber } from './auth.js'
 import { has1mContext } from './context.js'
-import { isEnvTruthy } from './envUtils.js'
+import { isEnvDefinedFalsy, isEnvTruthy } from './envUtils.js'
 import { getCanonicalName } from './model/model.js'
 import { get3PModelCapabilityOverride } from './model/modelSupportOverrides.js'
 import {
@@ -157,21 +157,55 @@ export function modelSupportsStructuredOutputs(model: string): boolean {
   )
 }
 
-export function modelSupportsAutoMode(_model: string): boolean {
-  return feature('TRANSCRIPT_CLASSIFIER')
+// @[MODEL LAUNCH]: Add the new model if it supports auto mode (specifically PI probes) — ask in #proj-claude-code-safety-research.
+export function modelSupportsAutoMode(model: string): boolean {
+  if (feature('TRANSCRIPT_CLASSIFIER')) {
+    const m = getCanonicalName(model)
+    // External: firstParty-only at launch (PI probes not wired for
+    // Bedrock/Vertex/Foundry yet). Checked before allowModels so the GB
+    // override can't enable auto mode on unsupported providers.
+    if (process.env.USER_TYPE !== 'ant' && getAPIProvider() !== 'firstParty') {
+      return false
+    }
+    // GrowthBook override: tengu_auto_mode_config.allowModels force-enables
+    // auto mode for listed models, bypassing the denylist/allowlist below.
+    // Exact model IDs (e.g. "claude-strudel-v6-p") match only that model;
+    // canonical names (e.g. "claude-strudel") match the whole family.
+    const config = getFeatureValue_CACHED_MAY_BE_STALE<{
+      allowModels?: string[]
+    }>('tengu_auto_mode_config', {})
+    const rawLower = model.toLowerCase()
+    if (
+      config?.allowModels?.some(
+        am => am.toLowerCase() === rawLower || am.toLowerCase() === m,
+      )
+    ) {
+      return true
+    }
+    if (process.env.USER_TYPE === 'ant') {
+      // Denylist: block known-unsupported claude models, allow everything else (ant-internal models etc.)
+      if (m.includes('claude-3-')) return false
+      // claude-*-4 not followed by -[6-9]: blocks bare -4, -4-YYYYMMDD, -4@, -4-0 thru -4-5
+      if (/claude-(opus|sonnet|haiku)-4(?!-[6-9])/.test(m)) return false
+      return true
+    }
+    // External allowlist (firstParty already checked above).
+    return /^claude-(opus|sonnet)-4-[67]/.test(m)
+  }
+  return false
 }
 
 /**
  * Get the correct tool search beta header for the current API provider.
+ * - Claude API / Foundry: advanced-tool-use-2025-11-20
  * - Vertex AI / Bedrock: tool-search-tool-2025-10-19
- * - All other providers: advanced-tool-use-2025-11-20
  */
-export function getSearchExtraToolsBetaHeader(): string {
+export function getToolSearchBetaHeader(): string {
   const provider = getAPIProvider()
   if (provider === 'vertex' || provider === 'bedrock') {
-    return SEARCH_EXTRA_TOOLS_BETA_HEADER_3P
+    return TOOL_SEARCH_BETA_HEADER_3P
   }
-  return SEARCH_EXTRA_TOOLS_BETA_HEADER_1P
+  return TOOL_SEARCH_BETA_HEADER_1P
 }
 
 /**
