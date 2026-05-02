@@ -63,7 +63,7 @@ export const DEFAULT_BUILD_FEATURES = [
   // 'HISTORY_SNIP', // 历史消息裁剪，压缩上下文窗口
   // 'CONTEXT_COLLAPSE', // 已禁用：实现是空壳 stub，启用后会抑制 auto compact 导致上下文管理完全失效
   'MONITOR_TOOL', // 已修复：require() 迁移后 splitting:true 不再触发 __esm() 死锁
-  // 'FORK_SUBAGENT',            // 已禁用：通过 Agent tool 的特殊方式实现了等效功能，无需再开
+  // 'FORK_SUBAGENT',            // 已禁用：显式 `fork: true` 参数触发 fork 路径（继承父级上下文和模型），不影响 forceAsync 和探索任务模型选择
   'KAIROS', // Kairos 定时任务系统核心
   'COORDINATOR_MODE', // 多 worker 编排模式（AgentSummary 泄露已在 52b61c2c 修复）
   // 'UDS_INBOX', // 进程间通信管道（inbox/pipe/peers 等命令）构建后 nodejs 环境卡住
