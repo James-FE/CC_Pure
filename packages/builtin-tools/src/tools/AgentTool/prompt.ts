@@ -4,12 +4,12 @@ import { hasEmbeddedSearchTools } from 'src/utils/embeddedTools.js'
 import { isEnvDefinedFalsy, isEnvTruthy } from 'src/utils/envUtils.js'
 import { isTeammate } from 'src/utils/teammate.js'
 import { isInProcessTeammate } from 'src/utils/teammateContext.js'
-import { FILE_READ_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/FileReadTool/prompt.js'
-import { GLOB_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/GlobTool/prompt.js'
-import { SEND_MESSAGE_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/SendMessageTool/constants.js'
-import { AGENT_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/AgentTool/constants.js'
-import { isForkSubagentEnabled } from '@claude-code-best/builtin-tools/tools/AgentTool/forkSubagent.js'
-import type { AgentDefinition } from '@claude-code-best/builtin-tools/tools/AgentTool/loadAgentsDir.js'
+import { FILE_READ_TOOL_NAME } from '../FileReadTool/prompt.js'
+import { GLOB_TOOL_NAME } from '../GlobTool/prompt.js'
+import { SEND_MESSAGE_TOOL_NAME } from '../SendMessageTool/constants.js'
+import { AGENT_TOOL_NAME } from './constants.js'
+import { isForkSubagentEnabled } from './forkSubagent.js'
+import type { AgentDefinition } from './loadAgentsDir.js'
 
 function getToolsDescription(agent: AgentDefinition): string {
   const { tools, disallowedTools } = agent
