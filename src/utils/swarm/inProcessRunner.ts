@@ -47,6 +47,7 @@ import {
 import type { CustomAgentDefinition } from '@claude-code-best/builtin-tools/tools/AgentTool/loadAgentsDir.js'
 import { runAgent } from '@claude-code-best/builtin-tools/tools/AgentTool/runAgent.js'
 import { awaitClassifierAutoApproval } from '@claude-code-best/builtin-tools/tools/BashTool/bashPermissions.js'
+import type { AgentToolResult } from '@claude-code-best/builtin-tools/tools/AgentTool/agentToolUtils.js'
 import { BASH_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/BashTool/toolName.js'
 import { SEND_MESSAGE_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/SendMessageTool/constants.js'
 import { TASK_CREATE_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/TaskCreateTool/constants.js'
@@ -63,7 +64,10 @@ import {
 } from '../../utils/messages.js'
 import { evictTaskOutput } from '../../utils/task/diskOutput.js'
 import { evictTerminalTask } from '../../utils/task/framework.js'
-import { tokenCountWithEstimation } from '../../utils/tokens.js'
+import {
+  tokenCountWithEstimation,
+  getTokenCountFromUsage,
+} from '../../utils/tokens.js'
 import { createAbortController } from '../abortController.js'
 import { type AgentContext, runWithAgentContext } from '../agentContext.js'
 import { count } from '../array.js'
@@ -713,8 +717,7 @@ async function waitForNextPromptOrShutdown(
       task.pendingUserMessages.length > 0
     ) {
       const pending = task.pendingUserMessages[0]! // Safe: checked length > 0
-      const message =
-        typeof pending === 'string' ? pending : pending.message
+      const message = typeof pending === 'string' ? pending : pending.message
       // Pop the message from the queue
       setAppState(prev => {
         const prevTask = prev.tasks[taskId]
@@ -910,6 +913,7 @@ export async function runInProcessTeammate(
     invokingRequestId,
   } = config
   const { setAppState } = toolUseContext
+  const startTime = Date.now()
 
   logForDebugging(
     `[inProcessRunner] Starting agent loop for ${identity.agentId}`,
@@ -1245,8 +1249,13 @@ export async function runInProcessTeammate(
                 // Track in-progress tool use IDs for animation in transcript view
                 let inProgressToolUseIDs = task.inProgressToolUseIDs
                 if (message.type === 'assistant') {
-                  for (const block of (Array.isArray(message.message!.content) ? message.message!.content : [])) {
-                    if (typeof block !== 'string' && block.type === 'tool_use') {
+                  for (const block of Array.isArray(message.message!.content)
+                    ? message.message!.content
+                    : []) {
+                    if (
+                      typeof block !== 'string' &&
+                      block.type === 'tool_use'
+                    ) {
                       inProgressToolUseIDs = new Set([
                         ...(inProgressToolUseIDs ?? []),
                         block.id,
@@ -1429,6 +1438,48 @@ export async function runInProcessTeammate(
     // Mark as completed when exiting the loop
     let alreadyTerminal = false
     let toolUseId: string | undefined
+
+    // Compute result so the detail dialog can show token usage.
+    // Walk backwards for the last API usage (cumulative input_tokens from the
+    // Anthropic API already includes all prior context).
+    let completionTokens = 0
+    let completionToolUseCount = 0
+    let lastAssistantContent: AgentToolResult['content'] = []
+    let lastUsage: AgentToolResult['usage'] | undefined
+    for (let i = allMessages.length - 1; i >= 0; i--) {
+      const m = allMessages[i]!
+      if (m.type === 'assistant') {
+        const blocks = (m.message?.content ?? []) as any[]
+        for (const b of blocks) {
+          if (b?.type === 'tool_use') completionToolUseCount++
+        }
+        const textBlocks = blocks.filter((b: any) => b?.type === 'text')
+        if (textBlocks.length > 0 && lastAssistantContent.length === 0) {
+          lastAssistantContent = textBlocks.map((b: any) => ({
+            type: 'text' as const,
+            text: b.text,
+          }))
+        }
+        if (!lastUsage && m.message?.usage) {
+          lastUsage = m.message.usage as AgentToolResult['usage']
+          completionTokens = getTokenCountFromUsage(
+            m.message.usage as Parameters<typeof getTokenCountFromUsage>[0],
+          )
+        }
+        if (completionTokens > 0 && lastAssistantContent.length > 0) break
+      }
+    }
+
+    const teammateResult: AgentToolResult = {
+      agentId: identity.agentId,
+      agentType: 'teammate',
+      content: lastAssistantContent,
+      totalToolUseCount: completionToolUseCount,
+      totalDurationMs: Date.now() - startTime,
+      totalTokens: completionTokens,
+      usage: lastUsage as AgentToolResult['usage'],
+    } as unknown as AgentToolResult
+
     updateTaskState(
       taskId,
       task => {
@@ -1447,6 +1498,7 @@ export async function runInProcessTeammate(
           status: 'completed' as const,
           notified: true,
           endTime: Date.now(),
+          result: teammateResult,
           messages: task.messages?.length ? [task.messages.at(-1)!] : undefined,
           pendingUserMessages: [],
           inProgressToolUseIDs: undefined,
