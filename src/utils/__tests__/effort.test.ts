@@ -223,6 +223,12 @@ describe("getEffortLevelDescription", () => {
     const desc = getEffortLevelDescription("max");
     expect(desc).toContain("Maximum");
   });
+
+  test("max description does not contain model names", () => {
+    const desc = getEffortLevelDescription("max");
+    expect(desc).not.toContain("Opus");
+    expect(desc).not.toContain("DeepSeek");
+  });
 });
 
 // ─── resolvePickerEffortPersistence ────────────────────────────────────
