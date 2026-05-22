@@ -9,6 +9,10 @@ import { isEnvTruthy } from './envUtils.js'
 import type { EffortLevel } from 'src/entrypoints/sdk/runtimeTypes.js'
 import { resolveAntModel } from './model/antModels.js'
 import { getAntModelOverrideConfig } from './model/antModels.js'
+import {
+  isChatGPTAuthMode,
+  isChatGPTCodexReasoningModel,
+} from './model/chatgptModels.js'
 
 export type { EffortLevel }
 
@@ -16,6 +20,7 @@ export const EFFORT_LEVELS = [
   'low',
   'medium',
   'high',
+  'xhigh',
   'max',
 ] as const satisfies readonly EffortLevel[]
 
@@ -31,8 +36,20 @@ export function modelSupportsEffort(model: string): boolean {
   if (supported3P !== undefined) {
     return supported3P
   }
+  if (
+    getAPIProvider() === 'openai' &&
+    isChatGPTAuthMode() &&
+    isChatGPTCodexReasoningModel(model)
+  ) {
+    return true
+  }
   // Supported by a subset of Claude 4 models
-  if (m.includes('opus-4-6') || m.includes('sonnet-4-6')) {
+  if (
+    m.includes('opus-4-7') ||
+    m.includes('opus-4-6') ||
+    m.includes('sonnet-4-6') ||
+    m.includes('deepseek-v4-pro')
+  ) {
     return true
   }
   // Exclude any other known legacy models (haiku, older opus/sonnet variants)
@@ -54,6 +71,14 @@ export function modelSupportsEffort(model: string): boolean {
 // can now use these levels. API errors are the user's responsibility.
 export function modelSupportsMaxEffort(_model: string): boolean {
   const supported3P = get3PModelCapabilityOverride(_model, 'max_effort')
+  if (supported3P !== undefined) {
+    return supported3P
+  }
+  return true
+}
+
+export function modelSupportsXhighEffort(_model: string): boolean {
+  const supported3P = get3PModelCapabilityOverride(_model, 'xhigh_effort')
   if (supported3P !== undefined) {
     return supported3P
   }
@@ -91,7 +116,12 @@ export function parseEffortValue(value: unknown): EffortValue | undefined {
 export function toPersistableEffort(
   value: EffortValue | undefined,
 ): EffortLevel | undefined {
-  if (value === 'low' || value === 'medium' || value === 'high') {
+  if (
+    value === 'low' ||
+    value === 'medium' ||
+    value === 'high' ||
+    value === 'xhigh'
+  ) {
     return value
   }
   if (value === 'max' && process.env.USER_TYPE === 'ant') {
@@ -155,9 +185,15 @@ export function resolveAppliedEffort(
   }
   const resolved =
     envOverride ?? appStateEffortValue ?? getDefaultEffortForModel(model)
-  // API rejects 'max' on non-Opus-4.6 models — downgrade to 'high'.
-  if (resolved === 'max' && !modelSupportsMaxEffort(model)) {
-    return 'high'
+  // OpenAI Responses uses xhigh as its highest public reasoning effort.
+  // Keep /effort max usable as a familiar alias in ChatGPT subscription mode.
+  if (
+    resolved === 'max' &&
+    getAPIProvider() === 'openai' &&
+    isChatGPTAuthMode() &&
+    modelSupportsXhighEffort(model)
+  ) {
+    return 'xhigh'
   }
   return resolved
 }
@@ -225,8 +261,10 @@ export function getEffortLevelDescription(level: EffortLevel): string {
       return 'Balanced approach with standard implementation and testing'
     case 'high':
       return 'Comprehensive implementation with extensive testing and documentation'
+    case 'xhigh':
+      return 'Extended reasoning beyond high, short of max (Opus 4.7 only)'
     case 'max':
-      return 'Maximum capability with deepest reasoning'
+      return 'Maximum capability with deepest reasoning (Opus 4.6/4.7/DeepSeek V4 Pro)'
   }
 }
 
@@ -300,17 +338,28 @@ export function getDefaultEffortForModel(
   // the model launch DRI and research. Default effort is a sensitive setting
   // that can greatly affect model quality and bashing.
 
+  if (
+    getAPIProvider() === 'openai' &&
+    isChatGPTAuthMode() &&
+    isChatGPTCodexReasoningModel(model)
+  ) {
+    return 'medium'
+  }
+
   // Default effort on Opus 4.6 to medium for Pro.
   // Max/Team also get medium when the tengu_grey_step2 config is enabled.
-  if (model.toLowerCase().includes('opus-4-6')) {
+  if (
+    model.toLowerCase().includes('opus-4-7') ||
+    model.toLowerCase().includes('opus-4-6')
+  ) {
     if (isProSubscriber()) {
-      return 'medium'
+      return 'high'
     }
     if (
       getOpusDefaultEffortConfig().enabled &&
       (isMaxSubscriber() || isTeamSubscriber())
     ) {
-      return 'medium'
+      return 'high'
     }
   }
 
