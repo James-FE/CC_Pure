@@ -4749,7 +4749,7 @@ function handleChannelEnable(
   // channel messages queue at priority 'next' and are seen by the model on
   // the turn after they arrive.
   connection.client.setNotificationHandler(
-    ChannelMessageNotificationSchema(),
+    ChannelMessageNotificationSchema() as any,
     async notification => {
       const { content, meta } = notification.params
       logMCPDebug(
@@ -4825,7 +4825,7 @@ function reregisterChannelHandlerAfterReconnect(
     'Channel notifications re-registered after reconnect',
   )
   connection.client.setNotificationHandler(
-    ChannelMessageNotificationSchema(),
+    ChannelMessageNotificationSchema() as any,
     async notification => {
       const { content, meta } = notification.params
       logMCPDebug(
