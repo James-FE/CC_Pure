@@ -50,20 +50,14 @@ export function modelSupportsEffort(model: string): boolean {
   return getAPIProvider() === 'firstParty'
 }
 
-// @[MODEL LAUNCH]: Add the new model to the allowlist if it supports 'max' effort.
-// Per API docs, 'max' is Opus 4.6 only for public models — other models return an error.
-export function modelSupportsMaxEffort(model: string): boolean {
-  const supported3P = get3PModelCapabilityOverride(model, 'max_effort')
+// Effort max/xhigh restrictions removed — all models that support effort
+// can now use these levels. API errors are the user's responsibility.
+export function modelSupportsMaxEffort(_model: string): boolean {
+  const supported3P = get3PModelCapabilityOverride(_model, 'max_effort')
   if (supported3P !== undefined) {
     return supported3P
   }
-  if (model.toLowerCase().includes('opus-4-6')) {
-    return true
-  }
-  if (process.env.USER_TYPE === 'ant' && resolveAntModel(model)) {
-    return true
-  }
-  return false
+  return true
 }
 
 export function isEffortLevel(value: string): value is EffortLevel {
