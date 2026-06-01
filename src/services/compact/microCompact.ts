@@ -217,6 +217,10 @@ export type MicrocompactResult = {
   compactionInfo?: {
     pendingCacheEdits?: PendingCacheEdits
   }
+  // Tool use IDs whose content was replaced with the cleared message.
+  // Callers should remove these from contentReplacementState.replacements
+  // to release the original strings from memory.
+  clearedToolUseIds?: string[]
 }
 
 /**
@@ -526,5 +530,5 @@ function maybeTimeBasedMicrocompact(
     notifyCacheDeletion(querySource)
   }
 
-  return { messages: result }
+  return { messages: result, clearedToolUseIds: [...clearSet] }
 }
