@@ -112,7 +112,7 @@ describe("mapNotebookCellsToToolResult", () => {
       'tool-2',
     )
     // Two adjacent text blocks should be merged into one
-    const textBlocks = result.content!.filter(
+    const textBlocks = (result.content as any[]).filter(
       (b: any) => b.type === "text"
     );
     expect(textBlocks).toHaveLength(1);

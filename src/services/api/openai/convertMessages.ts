@@ -141,7 +141,7 @@ function convertInternalUserMessage(
       } else if (block.type === 'tool_result') {
         toolResults.push(block as BetaToolResultBlockParam)
       } else if (block.type === 'image') {
-        const imagePart = convertImageBlockToOpenAI(block as Record<string, unknown>)
+        const imagePart = convertImageBlockToOpenAI(block as unknown as Record<string, unknown>)
         if (imagePart) {
           imageParts.push(imagePart)
         }
@@ -253,9 +253,9 @@ function convertInternalAssistantMessage(
       // DeepSeek thinking mode: always preserve reasoning_content,
       // including the empty-string case. DeepSeek v4 may return
       // reasoning_content: "" when the model answers directly, and the
-      // empty value must be echoed back in the next request — otherwise
+      // empty value must be echoed back in the next request - otherwise
       // DeepSeek returns 400 ("reasoning_content ... must be passed back").
-      const thinkingText = (block as Record<string, unknown>).thinking
+      const thinkingText = (block as unknown as Record<string, unknown>).thinking
       if (typeof thinkingText === 'string') {
         reasoningParts.push(thinkingText)
       }
