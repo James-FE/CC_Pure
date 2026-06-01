@@ -11,7 +11,12 @@ import { randomUUID } from 'crypto'
  *   delta.content            → content_block_start(text) + text_delta + content_block_stop
  *   delta.tool_calls         → content_block_start(tool_use) + input_json_delta + content_block_stop
  *   finish_reason            → message_delta(stop_reason) + message_stop
- *   usage.cached_tokens      → cache_read_input_tokens in message_start usage
+ *
+ * Usage field mapping (OpenAI → Anthropic):
+ *   prompt_tokens - cached_tokens             → input_tokens (non-cached input only)
+ *   completion_tokens                         → output_tokens
+ *   prompt_tokens_details.cached_tokens       → cache_read_input_tokens
+ *   (no OpenAI equivalent)                    → cache_creation_input_tokens (always 0)
  *
  * Thinking support:
  *   DeepSeek and compatible providers send `delta.reasoning_content` for chain-of-thought.
@@ -41,7 +46,10 @@ export async function* adaptOpenAIStreamToAnthropic(
   // Track text block state
   let textBlockOpen = false
 
-  // Track usage
+  // Track usage — all four Anthropic fields, populated from OpenAI usage fields:
+  // rawInputTokens tracks the raw prompt_tokens (OpenAI total, including cached).
+  // inputTokens is the derived Anthropic value (non-cached only = rawInputTokens - cachedTokens).
+  let rawInputTokens = 0
   let inputTokens = 0
   let outputTokens = 0
   let cachedTokens = 0
@@ -53,15 +61,19 @@ export async function* adaptOpenAIStreamToAnthropic(
     const choice = chunk.choices?.[0]
     const delta = choice?.delta
 
-    // Extract usage from any chunk that carries it
+    // Extract usage from any chunk that carries it.
     if (chunk.usage) {
-      inputTokens = chunk.usage.prompt_tokens ?? inputTokens
+      rawInputTokens = chunk.usage.prompt_tokens ?? rawInputTokens
+      const rawCached =
+        ((chunk.usage as any).prompt_tokens_details?.cached_tokens as
+          | number
+          | undefined) ?? cachedTokens
+      // Anthropic's input_tokens = non-cached input only. OpenAI's prompt_tokens
+      // includes cached tokens, so subtract. Clamp to 0 in case cached > total
+      // due to a streaming race.
+      inputTokens = Math.max(0, rawInputTokens - rawCached)
       outputTokens = chunk.usage.completion_tokens ?? outputTokens
-      // OpenAI prompt caching: prompt_tokens_details.cached_tokens
-      const details = (chunk.usage as any).prompt_tokens_details
-      if (details?.cached_tokens) {
-        cachedTokens = details.cached_tokens
-      }
+      cachedTokens = rawCached
     }
 
     // Emit message_start on first chunk
