@@ -86,6 +86,10 @@ import { getProjectRoot } from '../bootstrap/state.js'
 import { formatCommandsWithinBudget } from '../tools/SkillTool/prompt.js'
 import { getContextWindowForModel } from './context.js'
 import type { DiscoverySignal } from '../services/skillSearch/signals.js'
+import * as skillSearchFeatureCheck from '../services/skillSearch/featureCheck.js'
+import * as skillSearchPrefetch from '../services/skillSearch/prefetch.js'
+import { BRIEF_TOOL_NAME as BRIEF_TOOL_NAME_VALUE } from '../tools/BriefTool/prompt.js'
+import * as autoModeStateModuleValue from './permissions/autoModeState.js'
 // Conditional require for DCE. All skill-search string literals that would
 // otherwise leak into external builds live inside these modules. The only
 // surfaces in THIS file are: the maybe() call (gated via spread below) and
@@ -94,14 +98,12 @@ import type { DiscoverySignal } from '../services/skillSearch/signals.js'
 /* eslint-disable @typescript-eslint/no-require-imports */
 const skillSearchModules = feature('EXPERIMENTAL_SKILL_SEARCH')
   ? {
-      featureCheck:
-        require('../services/skillSearch/featureCheck.js') as typeof import('../services/skillSearch/featureCheck.js'),
-      prefetch:
-        require('../services/skillSearch/prefetch.js') as typeof import('../services/skillSearch/prefetch.js'),
+      featureCheck: skillSearchFeatureCheck,
+      prefetch: skillSearchPrefetch,
     }
   : null
 const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
-  ? (require('./permissions/autoModeState.js') as typeof import('./permissions/autoModeState.js'))
+  ? autoModeStateModuleValue
   : null
 /* eslint-enable @typescript-eslint/no-require-imports */
 import {
@@ -196,15 +198,14 @@ import {
 import { isHumanTurn } from './messagePredicates.js'
 import { isEnvTruthy, getClaudeConfigHomeDir } from './envUtils.js'
 import { feature } from 'bun:bundle'
+import * as sessionTranscriptModuleValue from '../services/sessionTranscript/sessionTranscript.js'
 /* eslint-disable @typescript-eslint/no-require-imports */
 const BRIEF_TOOL_NAME: string | null =
   feature('KAIROS') || feature('KAIROS_BRIEF')
-    ? (
-        require('../tools/BriefTool/prompt.js') as typeof import('../tools/BriefTool/prompt.js')
-      ).BRIEF_TOOL_NAME
+    ? BRIEF_TOOL_NAME_VALUE
     : null
 const sessionTranscriptModule = feature('KAIROS')
-  ? (require('../services/sessionTranscript/sessionTranscript.js') as typeof import('../services/sessionTranscript/sessionTranscript.js'))
+  ? sessionTranscriptModuleValue
   : null
 /* eslint-enable @typescript-eslint/no-require-imports */
 import { hasUltrathinkKeyword, isUltrathinkEnabled } from './thinking.js'

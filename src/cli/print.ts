@@ -352,23 +352,26 @@ import { initializeGrowthBook } from '../services/analytics/growthbook.js'
 import { errorMessage, toError } from '../utils/errors.js'
 import { sleep } from '../utils/sleep.js'
 import { isExtractModeActive } from '../memdir/paths.js'
+import * as proactiveModuleValue from '../proactive/index.js'
+import * as coordinatorModeModuleValue from '../coordinator/coordinatorMode.js'
+import * as cronSchedulerModuleValue from '../utils/cronScheduler.js'
+import * as cronJitterConfigModuleValue from '../utils/cronJitterConfig.js'
+import * as cronGateValue from '../tools/ScheduleCronTool/prompt.js'
+import * as extractMemoriesModuleValue from '../services/extractMemories/extractMemories.js'
 
-// Dead code elimination: conditional imports
-/* eslint-disable @typescript-eslint/no-require-imports */
 const coordinatorModeModule = feature('COORDINATOR_MODE')
-  ? (require('../coordinator/coordinatorMode.js') as typeof import('../coordinator/coordinatorMode.js'))
+  ? coordinatorModeModuleValue
   : null
 const proactiveModule =
   feature('PROACTIVE') || feature('KAIROS')
-    ? (require('../proactive/index.js') as typeof import('../proactive/index.js'))
+    ? proactiveModuleValue
     : null
-const cronSchedulerModule = require('../utils/cronScheduler.js') as typeof import('../utils/cronScheduler.js')
-const cronJitterConfigModule = require('../utils/cronJitterConfig.js') as typeof import('../utils/cronJitterConfig.js')
-const cronGate = require('../tools/ScheduleCronTool/prompt.js') as typeof import('../tools/ScheduleCronTool/prompt.js')
+const cronSchedulerModule = cronSchedulerModuleValue
+const cronJitterConfigModule = cronJitterConfigModuleValue
+const cronGate = cronGateValue
 const extractMemoriesModule = feature('EXTRACT_MEMORIES')
-  ? (require('../services/extractMemories/extractMemories.js') as typeof import('../services/extractMemories/extractMemories.js'))
+  ? extractMemoriesModuleValue
   : null
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 const SHUTDOWN_TEAM_PROMPT = `<system-reminder>
 You are running in non-interactive mode and cannot return a response to the user until your team is shut down.

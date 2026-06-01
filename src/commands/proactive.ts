@@ -11,6 +11,7 @@ import type {
   LocalJSXCommandContext,
   LocalJSXCommandOnDone,
 } from '../types/command.js'
+import * as proactiveModuleValue from '../proactive/index.js'
 
 const proactive = {
   type: 'local-jsx',
@@ -29,15 +30,11 @@ const proactive = {
         onDone: LocalJSXCommandOnDone,
         _context: ToolUseContext & LocalJSXCommandContext,
       ): Promise<React.ReactNode> {
-        // Dynamic require to avoid pulling proactive into non-gated builds
-        const mod =
-          require('../proactive/index.js') as typeof import('../proactive/index.js')
-
-        if (mod.isProactiveActive()) {
-          mod.deactivateProactive()
+        if (proactiveModuleValue.isProactiveActive()) {
+          proactiveModuleValue.deactivateProactive()
           onDone('Proactive mode disabled', { display: 'system' })
         } else {
-          mod.activateProactive('slash_command')
+          proactiveModuleValue.activateProactive('slash_command')
           onDone(
             'Proactive mode enabled — model will work autonomously between ticks',
             {

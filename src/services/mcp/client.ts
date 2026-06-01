@@ -230,6 +230,7 @@ function getMcpToolTimeoutMs(): number {
 }
 
 import { isClaudeInChromeMCPServer } from '../../utils/claudeInChrome/common.js'
+import { isComputerUseMCPServer as isComputerUseMCPServerValue } from '../../utils/computerUse/common.js'
 
 // Lazy: toolRendering.tsx pulls React/ink; only needed when Claude-in-Chrome MCP server is connected
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -244,9 +245,7 @@ const computerUseWrapper = feature('CHICAGO_MCP')
       require('../../utils/computerUse/wrapper.js')
   : undefined
 const isComputerUseMCPServer = feature('CHICAGO_MCP')
-  ? (
-      require('../../utils/computerUse/common.js') as typeof import('../../utils/computerUse/common.js')
-    ).isComputerUseMCPServer
+  ? isComputerUseMCPServerValue
   : undefined
 
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises'

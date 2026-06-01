@@ -3,22 +3,17 @@ import { isReplBridgeActive } from '../../bootstrap/state.js'
 import { getFeatureValue_CACHED_MAY_BE_STALE } from '../../services/analytics/growthbook.js'
 import type { Tool } from '../../Tool.js'
 import { AGENT_TOOL_NAME } from '../AgentTool/constants.js'
+import { BRIEF_TOOL_NAME as BRIEF_TOOL_NAME_VALUE } from '../BriefTool/prompt.js'
+import { SEND_USER_FILE_TOOL_NAME as SEND_USER_FILE_TOOL_NAME_VALUE } from '../SendUserFileTool/prompt.js'
 
-// Dead code elimination: Brief tool name only needed when KAIROS or KAIROS_BRIEF is on
-/* eslint-disable @typescript-eslint/no-require-imports */
+// Dead code elimination: Brief tool names are only used when KAIROS/KAIROS_BRIEF is on.
 const BRIEF_TOOL_NAME: string | null =
   feature('KAIROS') || feature('KAIROS_BRIEF')
-    ? (
-        require('../BriefTool/prompt.js') as typeof import('../BriefTool/prompt.js')
-      ).BRIEF_TOOL_NAME
+    ? BRIEF_TOOL_NAME_VALUE
     : null
 const SEND_USER_FILE_TOOL_NAME: string | null = feature('KAIROS')
-  ? (
-      require('../SendUserFileTool/prompt.js') as typeof import('../SendUserFileTool/prompt.js')
-    ).SEND_USER_FILE_TOOL_NAME
+  ? SEND_USER_FILE_TOOL_NAME_VALUE
   : null
-
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 export { TOOL_SEARCH_TOOL_NAME } from './constants.js'
 

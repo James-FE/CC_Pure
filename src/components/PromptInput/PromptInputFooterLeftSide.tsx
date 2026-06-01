@@ -51,14 +51,12 @@ import { isXtermJs, useHasSelection, useSelection } from '@anthropic/ink'
 import { getGlobalConfig, saveGlobalConfig } from '../../utils/config.js'
 import { getPlatform } from '../../utils/platform.js'
 import { PrBadge } from '../PrBadge.js'
+import * as proactiveModuleValue from '../../proactive/index.js'
 
-// Dead code elimination: conditional import for proactive mode
-/* eslint-disable @typescript-eslint/no-require-imports */
 const proactiveModule =
   feature('PROACTIVE') || feature('KAIROS')
-    ? require('../../proactive/index.js')
+    ? proactiveModuleValue
     : null
-/* eslint-enable @typescript-eslint/no-require-imports */
 const NO_OP_SUBSCRIBE = (_cb: () => void) => () => {}
 const NULL = () => null
 const MAX_VOICE_HINT_SHOWS = 3

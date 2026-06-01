@@ -101,10 +101,10 @@ import {
   extractQuotaStatusFromHeaders,
 } from '../claudeAiLimits.js'
 import { getAPIContextManagement } from '../compact/apiMicrocompact.js'
+import * as autoModeStateModuleValue from '../../utils/permissions/autoModeState.js'
 
-/* eslint-disable @typescript-eslint/no-require-imports */
 const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
-  ? (require('../../utils/permissions/autoModeState.js') as typeof import('../../utils/permissions/autoModeState.js'))
+  ? autoModeStateModuleValue
   : null
 
 import { feature } from 'bun:bundle'

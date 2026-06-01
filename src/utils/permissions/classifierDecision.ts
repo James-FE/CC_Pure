@@ -19,6 +19,7 @@ import { TEAM_CREATE_TOOL_NAME } from '../../tools/TeamCreateTool/constants.js'
 import { TEAM_DELETE_TOOL_NAME } from '../../tools/TeamDeleteTool/constants.js'
 import { TODO_WRITE_TOOL_NAME } from '../../tools/TodoWriteTool/constants.js'
 import { TOOL_SEARCH_TOOL_NAME } from '../../tools/ToolSearchTool/prompt.js'
+import { WORKFLOW_TOOL_NAME as WORKFLOW_TOOL_NAME_VALUE } from '../../tools/WorkflowTool/constants.js'
 import { YOLO_CLASSIFIER_TOOL_NAME } from './yoloClassifier.js'
 
 // Ant-only tool names: conditional require so Bun can DCE these in external builds.
@@ -41,9 +42,7 @@ const VERIFY_PLAN_EXECUTION_TOOL_NAME =
       ).VERIFY_PLAN_EXECUTION_TOOL_NAME
     : null
 const WORKFLOW_TOOL_NAME = feature('WORKFLOW_SCRIPTS')
-  ? (
-      require('../../tools/WorkflowTool/constants.js') as typeof import('../../tools/WorkflowTool/constants.js')
-    ).WORKFLOW_TOOL_NAME
+  ? WORKFLOW_TOOL_NAME_VALUE
   : null
 /* eslint-enable @typescript-eslint/no-require-imports */
 

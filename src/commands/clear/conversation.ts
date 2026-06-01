@@ -3,6 +3,7 @@
  * This module has heavier dependencies and should be lazy-loaded when possible.
  */
 import { feature } from 'bun:bundle'
+import { setContextBlocked } from '../../proactive/index.js'
 import { randomUUID, type UUID } from 'crypto'
 import {
   getLastMainRequestId,
@@ -110,9 +111,6 @@ export async function clearConversation({
 
   // Clear context-blocked flag so proactive ticks resume after /clear
   if (feature('PROACTIVE') || feature('KAIROS')) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
-    const { setContextBlocked } = require('../../proactive/index.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
     setContextBlocked(false)
   }
 

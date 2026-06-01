@@ -4,6 +4,7 @@ import type { ToolResultBlockParam } from '@anthropic-ai/sdk/resources/index.mjs
 import { buildTool } from '../../Tool.js'
 import { lazySchema } from '../../utils/lazySchema.js'
 import { SLEEP_TOOL_NAME, DESCRIPTION, SLEEP_TOOL_PROMPT } from './prompt.js'
+import * as proactiveModuleValue from '../../proactive/index.js'
 
 const inputSchema = lazySchema(() =>
   z.strictObject({
@@ -70,9 +71,7 @@ export const SleepTool = buildTool({
     // Refuse to sleep when proactive mode is off — prevents the model from
     // re-issuing Sleep after an interruption caused by /proactive disable.
     if (feature('PROACTIVE') || feature('KAIROS')) {
-      const mod =
-        require('../../proactive/index.js') as typeof import('../../proactive/index.js')
-      if (!mod.isProactiveActive()) {
+      if (!proactiveModuleValue.isProactiveActive()) {
         return {
           data: {
             slept_seconds: 0,
@@ -105,9 +104,7 @@ export const SleepTool = buildTool({
         const proactiveCheck =
           feature('PROACTIVE') || feature('KAIROS')
             ? setInterval(() => {
-                const mod =
-                  require('../../proactive/index.js') as typeof import('../../proactive/index.js')
-                if (!mod.isProactiveActive()) {
+                if (!proactiveModuleValue.isProactiveActive()) {
                   clearTimeout(timer)
                   clearInterval(proactiveCheck)
                   reject(new Error('interrupted'))

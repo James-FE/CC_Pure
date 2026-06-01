@@ -25,6 +25,7 @@ import { ALL_MODEL_CONFIGS } from '../utils/model/configs.js';
 import { updateTaskState } from '../utils/task/framework.js';
 import { archiveRemoteSession, teleportToRemote } from '../utils/teleport.js';
 import { pollForApprovedExitPlanMode, UltraplanPollError } from '../utils/ultraplan/ccrSession.js';
+import rawUltraplanPrompt from '../utils/ultraplan/prompt.txt';
 
 // TODO(prod-hardening): OAuth token may go stale over the 30min poll;
 // consider refresh.
@@ -51,11 +52,7 @@ function getUltraplanModel(): string {
 // any tag stripping, and a bare "ultraplan" in the prompt would self-trigger as
 // /ultraplan, which is filtered out of headless mode as "Unknown skill"
 //
-// Bundler inlines .txt as a string; the test runner wraps it as {default}.
-/* eslint-disable @typescript-eslint/no-require-imports */
-const _rawPrompt = require('../utils/ultraplan/prompt.txt');
-/* eslint-enable @typescript-eslint/no-require-imports */
-const DEFAULT_INSTRUCTIONS: string = (typeof _rawPrompt === 'string' ? _rawPrompt : _rawPrompt.default).trimEnd();
+const DEFAULT_INSTRUCTIONS: string = rawUltraplanPrompt.trimEnd();
 
 // Dev-only prompt override resolved eagerly at module load.
 // Gated to ant builds (USER_TYPE is a build-time define,

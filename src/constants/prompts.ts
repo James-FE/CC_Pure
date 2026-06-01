@@ -61,6 +61,11 @@ import { loadMemoryPrompt } from '../memdir/memdir.js'
 import { isUndercover } from '../utils/undercover.js'
 import { getAntModelOverrideConfig } from '../utils/model/antModels.js'
 import { isMcpInstructionsDeltaEnabled } from '../utils/mcpInstructionsDelta.js'
+import { BRIEF_PROACTIVE_SECTION as BRIEF_PROACTIVE_SECTION_VALUE } from '../tools/BriefTool/prompt.js'
+import * as proactiveModuleValue from '../proactive/index.js'
+import * as briefToolModuleValue from '../tools/BriefTool/BriefTool.js'
+import { DISCOVER_SKILLS_TOOL_NAME as DISCOVER_SKILLS_TOOL_NAME_VALUE } from '../tools/DiscoverSkillsTool/prompt.js'
+import * as skillSearchFeatureCheckValue from '../services/skillSearch/featureCheck.js'
 
 // Dead code elimination: conditional imports for feature-gated modules
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -71,30 +76,24 @@ const getCachedMCConfigForFRC = feature('CACHED_MICROCOMPACT')
   : null
 
 const proactiveModule =
-  feature('PROACTIVE') || feature('KAIROS')
-    ? require('../proactive/index.js')
-    : null
+  feature('PROACTIVE') || feature('KAIROS') ? proactiveModuleValue : null
 const BRIEF_PROACTIVE_SECTION: string | null =
   feature('KAIROS') || feature('KAIROS_BRIEF')
-    ? (
-        require('../tools/BriefTool/prompt.js') as typeof import('../tools/BriefTool/prompt.js')
-      ).BRIEF_PROACTIVE_SECTION
+    ? BRIEF_PROACTIVE_SECTION_VALUE
     : null
 const briefToolModule =
   feature('KAIROS') || feature('KAIROS_BRIEF')
-    ? (require('../tools/BriefTool/BriefTool.js') as typeof import('../tools/BriefTool/BriefTool.js'))
+    ? briefToolModuleValue
     : null
 const DISCOVER_SKILLS_TOOL_NAME: string | null = feature(
   'EXPERIMENTAL_SKILL_SEARCH',
 )
-  ? (
-      require('../tools/DiscoverSkillsTool/prompt.js') as typeof import('../tools/DiscoverSkillsTool/prompt.js')
-    ).DISCOVER_SKILLS_TOOL_NAME
+  ? DISCOVER_SKILLS_TOOL_NAME_VALUE
   : null
 // Capture the module (not .isSkillSearchEnabled directly) so spyOn() in tests
 // patches what we actually call — a captured function ref would point past the spy.
 const skillSearchFeatureCheck = feature('EXPERIMENTAL_SKILL_SEARCH')
-  ? (require('../services/skillSearch/featureCheck.js') as typeof import('../services/skillSearch/featureCheck.js'))
+  ? skillSearchFeatureCheckValue
   : null
 /* eslint-enable @typescript-eslint/no-require-imports */
 import type { OutputStyleConfig } from './outputStyles.js'

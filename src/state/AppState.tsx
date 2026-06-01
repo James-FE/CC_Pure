@@ -7,6 +7,7 @@ import React, {
   useSyncExternalStore,
 } from 'react'
 import { MailboxProvider } from '../context/mailbox.js'
+import { VoiceProvider as VoiceProviderValue } from '../context/voice.js'
 import { useSettingsChange } from '../hooks/useSettingsChange.js'
 import { logForDebugging } from '../utils/debug.js'
 import {
@@ -17,14 +18,8 @@ import { applySettingsChange } from '../utils/settings/applySettingsChange.js'
 import type { SettingSource } from '../utils/settings/constants.js'
 import { createStore } from './store.js'
 
-// DCE: voice context is ant-only. External builds get a passthrough.
-/* eslint-disable @typescript-eslint/no-require-imports */
 const VoiceProvider: (props: { children: React.ReactNode }) => React.ReactNode =
-  feature('VOICE_MODE')
-    ? require('../context/voice.js').VoiceProvider
-    : ({ children }) => children
-
-/* eslint-enable @typescript-eslint/no-require-imports */
+  feature('VOICE_MODE') ? VoiceProviderValue : ({ children }) => children
 import {
   type AppState,
   type AppStateStore,

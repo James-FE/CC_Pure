@@ -28,8 +28,16 @@ import { LocalAgentTask } from 'src/tasks/LocalAgentTask/LocalAgentTask.js'
 import type { LocalShellTaskState } from 'src/tasks/LocalShellTask/guards.js'
 import { LocalShellTask } from 'src/tasks/LocalShellTask/LocalShellTask.js'
 // Type import is erased at build time — safe even though module is ant-gated.
-import type { LocalWorkflowTaskState } from 'src/tasks/LocalWorkflowTask/LocalWorkflowTask.js'
-import type { MonitorMcpTaskState } from 'src/tasks/MonitorMcpTask/MonitorMcpTask.js'
+import {
+  killWorkflowTask as killWorkflowTaskValue,
+  retryWorkflowAgent as retryWorkflowAgentValue,
+  skipWorkflowAgent as skipWorkflowAgentValue,
+  type LocalWorkflowTaskState,
+} from 'src/tasks/LocalWorkflowTask/LocalWorkflowTask.js'
+import {
+  killMonitorMcp as killMonitorMcpValue,
+  type MonitorMcpTaskState,
+} from 'src/tasks/MonitorMcpTask/MonitorMcpTask.js'
 import {
   RemoteAgentTask,
   type RemoteAgentTaskState,
@@ -43,6 +51,8 @@ import type { DeepImmutable } from 'src/types/utils.js'
 import { intersperse } from 'src/utils/array.js'
 import { TEAM_LEAD_NAME } from 'src/utils/swarm/constants.js'
 import { stopUltraplan } from '../../commands/ultraplan.js'
+import { MonitorMcpDetailDialog as MonitorMcpDetailDialogValue } from './MonitorMcpDetailDialog.js'
+import { WorkflowDetailDialog as WorkflowDetailDialogValue } from './WorkflowDetailDialog.js'
 import type { CommandResultDisplay } from '../../commands.js'
 import { useRegisterOverlay } from '../../context/overlayContext.js'
 import type { ExitState } from '../../hooks/useExitOnCtrlCDWithKeybindings.js'
@@ -129,31 +139,22 @@ type ListItem =
 // WORKFLOW_SCRIPTS is ant-only (build_flags.yaml). Static imports would leak
 // ~1.3K lines into external builds. Gate with feature() + require so the
 // bundler can dead-code-eliminate the branch.
-/* eslint-disable @typescript-eslint/no-require-imports */
 const WorkflowDetailDialog = feature('WORKFLOW_SCRIPTS')
-  ? (
-      require('./WorkflowDetailDialog.js') as typeof import('./WorkflowDetailDialog.js')
-    ).WorkflowDetailDialog
+  ? WorkflowDetailDialogValue
   : null
-const workflowTaskModule = feature('WORKFLOW_SCRIPTS')
-  ? (require('src/tasks/LocalWorkflowTask/LocalWorkflowTask.js') as typeof import('src/tasks/LocalWorkflowTask/LocalWorkflowTask.js'))
+const killWorkflowTask = feature('WORKFLOW_SCRIPTS')
+  ? killWorkflowTaskValue
   : null
-const killWorkflowTask = workflowTaskModule?.killWorkflowTask ?? null
-const skipWorkflowAgent = workflowTaskModule?.skipWorkflowAgent ?? null
-const retryWorkflowAgent = workflowTaskModule?.retryWorkflowAgent ?? null
-// Relative path, not `src/...` path-mapping — Bun's DCE can statically
-// resolve + eliminate `./` requires, but path-mapped strings stay opaque
-// and survive as dead literals in the bundle. Matches tasks.ts pattern.
-const monitorMcpModule = feature('MONITOR_TOOL')
-  ? (require('../../tasks/MonitorMcpTask/MonitorMcpTask.js') as typeof import('../../tasks/MonitorMcpTask/MonitorMcpTask.js'))
+const skipWorkflowAgent = feature('WORKFLOW_SCRIPTS')
+  ? skipWorkflowAgentValue
   : null
-const killMonitorMcp = monitorMcpModule?.killMonitorMcp ?? null
+const retryWorkflowAgent = feature('WORKFLOW_SCRIPTS')
+  ? retryWorkflowAgentValue
+  : null
+const killMonitorMcp = feature('MONITOR_TOOL') ? killMonitorMcpValue : null
 const MonitorMcpDetailDialog = feature('MONITOR_TOOL')
-  ? (
-      require('./MonitorMcpDetailDialog.js') as typeof import('./MonitorMcpDetailDialog.js')
-    ).MonitorMcpDetailDialog
+  ? MonitorMcpDetailDialogValue
   : null
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 // Helper to get filtered background tasks (excludes foregrounded local_agent)
 function getSelectableBackgroundTasks(

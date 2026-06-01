@@ -69,6 +69,7 @@ import type { ToolUseConfirm } from './permissions/PermissionRequest.js'
 import { StatusNotices } from './StatusNotices.js'
 import type { JumpHandle } from './VirtualMessageList.js'
 import { VirtualMessageList } from './VirtualMessageList.js'
+import * as proactiveModuleValue from '../proactive/index.js'
 
 // Memoed logo header: this box is the FIRST sibling before all MessageRows
 // in main-screen mode. If it becomes dirty on every Messages re-render,
@@ -98,13 +99,10 @@ const LogoHeader = React.memo(function LogoHeader({
   )
 })
 
-// Dead code elimination: conditional import for proactive mode
-/* eslint-disable @typescript-eslint/no-require-imports */
 const proactiveModule =
   feature('PROACTIVE') || feature('KAIROS')
-    ? require('../proactive/index.js')
+    ? proactiveModuleValue
     : null
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 const BRIEF_TOOL_NAME: string | null =
   feature('KAIROS') || feature('KAIROS_BRIEF') ? BRIEF_TOOL_NAME_VALUE : null

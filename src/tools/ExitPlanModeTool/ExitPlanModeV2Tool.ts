@@ -47,15 +47,15 @@ import {
   renderToolUseMessage,
   renderToolUseRejectedMessage,
 } from './UI.js'
+import * as autoModeStateModuleValue from '../../utils/permissions/autoModeState.js'
+import * as permissionSetupModuleValue from '../../utils/permissions/permissionSetup.js'
 
-/* eslint-disable @typescript-eslint/no-require-imports */
 const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
-  ? (require('../../utils/permissions/autoModeState.js') as typeof import('../../utils/permissions/autoModeState.js'))
+  ? autoModeStateModuleValue
   : null
 const permissionSetupModule = feature('TRANSCRIPT_CLASSIFIER')
-  ? (require('../../utils/permissions/permissionSetup.js') as typeof import('../../utils/permissions/permissionSetup.js'))
+  ? permissionSetupModuleValue
   : null
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 /**
  * Schema for prompt-based permission requests.

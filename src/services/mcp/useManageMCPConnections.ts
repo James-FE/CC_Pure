@@ -3,6 +3,7 @@ import { basename } from 'path'
 import { useCallback, useEffect, useRef } from 'react'
 import { getSessionId } from '../../bootstrap/state.js'
 import type { Command } from '../../commands.js'
+import { clearSkillIndexCache as clearSkillIndexCacheValue } from '../skillSearch/localSearch.js'
 import type { Tool } from '../../Tool.js'
 import {
   clearServerCache,
@@ -25,9 +26,7 @@ const fetchMcpSkillsForClient = feature('MCP_SKILLS')
     ).fetchMcpSkillsForClient
   : null
 const clearSkillIndexCache = feature('EXPERIMENTAL_SKILL_SEARCH')
-  ? (
-      require('../skillSearch/localSearch.js') as typeof import('../skillSearch/localSearch.js')
-    ).clearSkillIndexCache
+  ? clearSkillIndexCacheValue
   : null
 
 import {

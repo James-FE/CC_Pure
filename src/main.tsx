@@ -77,6 +77,10 @@ import {
 	createSyntheticOutputTool,
 	isSyntheticOutputToolEnabled,
 } from "./tools/SyntheticOutputTool/SyntheticOutputTool.js";
+import {
+	BRIEF_TOOL_NAME as BRIEF_TOOL_NAME_VALUE,
+	LEGACY_BRIEF_TOOL_NAME as LEGACY_BRIEF_TOOL_NAME_VALUE,
+} from "./tools/BriefTool/prompt.js";
 import { getTools } from "./tools.js";
 import {
 	canUserConfigureAdvisor,
@@ -121,6 +125,10 @@ import { jsonParse, writeFileSync_DEPRECATED } from "./utils/slowOperations.js";
 import { computeInitialTeamContext } from "./utils/swarm/reconnection.js";
 import { initializeWarningHandler } from "./utils/warningHandler.js";
 import { isWorktreeModeEnabled } from "./utils/worktreeModeEnabled.js";
+import * as coordinatorModeModuleValue from "./coordinator/coordinatorMode.js";
+import * as assistantModuleValue from "./assistant/index.js";
+import * as kairosGateValue from "./assistant/gate.js";
+import * as proactiveModuleValue from "./proactive/index.js";
 
 // Lazy require to avoid circular dependency: teammate.ts -> AppState.tsx -> ... -> main.tsx
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -131,19 +139,14 @@ const getTeammatePromptAddendum = () =>
 const getTeammateModeSnapshot = () =>
 	require("./utils/swarm/backends/teammateModeSnapshot.js") as typeof import("./utils/swarm/backends/teammateModeSnapshot.js");
 /* eslint-enable @typescript-eslint/no-require-imports */
-// Dead code elimination: conditional import for COORDINATOR_MODE
-/* eslint-disable @typescript-eslint/no-require-imports */
 const coordinatorModeModule = feature("COORDINATOR_MODE")
-	? (require("./coordinator/coordinatorMode.js") as typeof import("./coordinator/coordinatorMode.js"))
+	? coordinatorModeModuleValue
 	: null;
-/* eslint-enable @typescript-eslint/no-require-imports */
-// Dead code elimination: conditional import for KAIROS (assistant mode)
-/* eslint-disable @typescript-eslint/no-require-imports */
 const assistantModule = feature("KAIROS")
-	? (require("./assistant/index.js") as typeof import("./assistant/index.js"))
+	? assistantModuleValue
 	: null;
 const kairosGate = feature("KAIROS")
-	? (require("./assistant/gate.js") as typeof import("./assistant/gate.js"))
+	? kairosGateValue
 	: null;
 
 import { relative, resolve } from "path";
@@ -382,10 +385,10 @@ import {
 	setUserMsgOptIn,
 	switchSession,
 } from "./bootstrap/state.js";
+import * as autoModeStateModuleValue from "./utils/permissions/autoModeState.js";
 
-/* eslint-disable @typescript-eslint/no-require-imports */
 const autoModeStateModule = feature("TRANSCRIPT_CLASSIFIER")
-	? (require("./utils/permissions/autoModeState.js") as typeof import("./utils/permissions/autoModeState.js"))
+	? autoModeStateModuleValue
 	: null;
 
 // TeleportRepoMismatchDialog, TeleportResumeWrapper dynamically imported at call sites
@@ -2664,15 +2667,13 @@ async function run(): Promise<CommanderCommand> {
 				baseTools.length > 0
 			) {
 				/* eslint-disable @typescript-eslint/no-require-imports */
-				const { BRIEF_TOOL_NAME, LEGACY_BRIEF_TOOL_NAME } =
-					require("./tools/BriefTool/prompt.js") as typeof import("./tools/BriefTool/prompt.js");
 				const { isBriefEntitled } =
 					require("./tools/BriefTool/BriefTool.js") as typeof import("./tools/BriefTool/BriefTool.js");
 				/* eslint-enable @typescript-eslint/no-require-imports */
 				const parsed = parseToolListFromCLI(baseTools);
 				if (
-					(parsed.includes(BRIEF_TOOL_NAME) ||
-						parsed.includes(LEGACY_BRIEF_TOOL_NAME)) &&
+					(parsed.includes(BRIEF_TOOL_NAME_VALUE) ||
+						parsed.includes(LEGACY_BRIEF_TOOL_NAME_VALUE)) &&
 					isBriefEntitled()
 				) {
 					setUserMsgOptIn(true);
@@ -6948,10 +6949,8 @@ function maybeActivateProactive(options: unknown): void {
 		((options as { proactive?: boolean }).proactive ||
 			isEnvTruthy(process.env.CLAUDE_CODE_PROACTIVE))
 	) {
-		// eslint-disable-next-line @typescript-eslint/no-require-imports
-		const proactiveModule = require("./proactive/index.js");
-		if (!proactiveModule.isProactiveActive()) {
-			proactiveModule.activateProactive("command");
+		if (!proactiveModuleValue.isProactiveActive()) {
+			proactiveModuleValue.activateProactive("command");
 		}
 	}
 }

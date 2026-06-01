@@ -3,6 +3,11 @@ import type { UUID } from 'crypto'
 import { relative } from 'path'
 import { getCwd } from 'src/utils/cwd.js'
 import { addInvokedSkill } from '../bootstrap/state.js'
+import {
+  BRIEF_TOOL_NAME as BRIEF_TOOL_NAME_VALUE,
+  LEGACY_BRIEF_TOOL_NAME as LEGACY_BRIEF_TOOL_NAME_VALUE,
+} from '../tools/BriefTool/prompt.js'
+import { SEND_USER_FILE_TOOL_NAME as SEND_USER_FILE_TOOL_NAME_VALUE } from '../tools/SendUserFileTool/prompt.js'
 import { asSessionId } from '../types/ids.js'
 import type {
   AttributionSnapshotMessage,
@@ -49,27 +54,17 @@ import {
 } from './sessionStorage.js'
 import type { ContentReplacementRecord } from './toolResultStorage.js'
 
-// Dead code elimination: ant-only tool names are conditionally required so
-// their strings don't leak into external builds. Static imports always bundle.
-/* eslint-disable @typescript-eslint/no-require-imports */
 const BRIEF_TOOL_NAME: string | null =
   feature('KAIROS') || feature('KAIROS_BRIEF')
-    ? (
-        require('../tools/BriefTool/prompt.js') as typeof import('../tools/BriefTool/prompt.js')
-      ).BRIEF_TOOL_NAME
+    ? BRIEF_TOOL_NAME_VALUE
     : null
 const LEGACY_BRIEF_TOOL_NAME: string | null =
   feature('KAIROS') || feature('KAIROS_BRIEF')
-    ? (
-        require('../tools/BriefTool/prompt.js') as typeof import('../tools/BriefTool/prompt.js')
-      ).LEGACY_BRIEF_TOOL_NAME
+    ? LEGACY_BRIEF_TOOL_NAME_VALUE
     : null
 const SEND_USER_FILE_TOOL_NAME: string | null = feature('KAIROS')
-  ? (
-      require('../tools/SendUserFileTool/prompt.js') as typeof import('../tools/SendUserFileTool/prompt.js')
-    ).SEND_USER_FILE_TOOL_NAME
+  ? SEND_USER_FILE_TOOL_NAME_VALUE
   : null
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 /**
  * Transforms legacy attachment types to current types for backward compatibility

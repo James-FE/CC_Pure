@@ -33,6 +33,10 @@ import {
   parsePluginIdentifier,
 } from 'src/utils/plugins/pluginIdentifier.js'
 import { buildPluginCommandTelemetryFields } from 'src/utils/telemetry/pluginTelemetry.js'
+import * as remoteSkillFeatureCheck from '../../services/skillSearch/featureCheck.js'
+import * as remoteSkillLoader from '../../services/skillSearch/remoteSkillLoader.js'
+import * as remoteSkillState from '../../services/skillSearch/remoteSkillState.js'
+import * as remoteSkillTelemetry from '../../services/skillSearch/telemetry.js'
 import { z } from 'zod/v4'
 import {
   addInvokedSkill,
@@ -104,16 +108,14 @@ import type { SkillToolProgress as Progress } from '../../types/tools.js'
 // side-effecting initializers. All usages are inside
 // feature('EXPERIMENTAL_SKILL_SEARCH') guards, so remoteSkillModules is
 // non-null at every call site.
-/* eslint-disable @typescript-eslint/no-require-imports */
 const remoteSkillModules = feature('EXPERIMENTAL_SKILL_SEARCH')
   ? {
-      ...(require('../../services/skillSearch/remoteSkillState.js') as typeof import('../../services/skillSearch/remoteSkillState.js')),
-      ...(require('../../services/skillSearch/remoteSkillLoader.js') as typeof import('../../services/skillSearch/remoteSkillLoader.js')),
-      ...(require('../../services/skillSearch/telemetry.js') as typeof import('../../services/skillSearch/telemetry.js')),
-      ...(require('../../services/skillSearch/featureCheck.js') as typeof import('../../services/skillSearch/featureCheck.js')),
+      ...remoteSkillState,
+      ...remoteSkillLoader,
+      ...remoteSkillTelemetry,
+      ...remoteSkillFeatureCheck,
     }
   : null
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 /**
  * Executes a skill in a forked sub-agent context.

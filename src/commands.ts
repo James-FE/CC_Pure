@@ -57,39 +57,48 @@ import usage from './commands/usage/index.js'
 import theme from './commands/theme/index.js'
 import vim from './commands/vim/index.js'
 import { feature } from 'bun:bundle'
-// Dead code elimination: conditional imports
-/* eslint-disable @typescript-eslint/no-require-imports */
+import { clearSkillIndexCache as clearSkillIndexCacheValue } from './services/skillSearch/localSearch.js'
+import proactiveValue from './commands/proactive.js'
+import briefCommandValue from './commands/brief.js'
+import assistantCommandValue from './commands/assistant/index.js'
+import bridgeValue from './commands/bridge/index.js'
+import remoteControlServerCommandValue from './commands/remoteControlServer/index.js'
+import voiceCommandValue from './commands/voice/index.js'
+import coordinatorCmdValue from './commands/coordinator.js'
+import workflowsCmdValue from './commands/workflows/index.js'
+import ultraplanValue from './commands/ultraplan.js'
+import buddyValue from './commands/buddy/index.js'
+import { getWorkflowCommands as getWorkflowCommandsValue } from './tools/WorkflowTool/createWorkflowCommand.js'
+
 const proactive =
   feature('PROACTIVE') || feature('KAIROS')
-    ? require('./commands/proactive.js').default
+    ? proactiveValue
     : null
 const briefCommand =
   feature('KAIROS') || feature('KAIROS_BRIEF')
-    ? require('./commands/brief.js').default
+    ? briefCommandValue
     : null
 const assistantCommand = feature('KAIROS')
-  ? require('./commands/assistant/index.js').default
+  ? assistantCommandValue
   : null
 const bridge = feature('BRIDGE_MODE')
-  ? require('./commands/bridge/index.js').default
+  ? bridgeValue
   : null
 const remoteControlServerCommand =
   feature('DAEMON') && feature('BRIDGE_MODE')
-    ? require('./commands/remoteControlServer/index.js').default
+    ? remoteControlServerCommandValue
     : null
 const voiceCommand = feature('VOICE_MODE')
-  ? require('./commands/voice/index.js').default
+  ? voiceCommandValue
   : null
 const coordinatorCmd = feature('COORDINATOR_MODE')
-  ? require('./commands/coordinator.js').default
+  ? coordinatorCmdValue
   : null
 const forceSnip = feature('HISTORY_SNIP')
   ? require('./commands/force-snip.js').default
   : null
 const workflowsCmd = feature('WORKFLOW_SCRIPTS')
-  ? (
-      require('./commands/workflows/index.js') as typeof import('./commands/workflows/index.js')
-    ).default
+  ? workflowsCmdValue
   : null
 const webCmd = feature('CCR_REMOTE_SETUP')
   ? (
@@ -97,15 +106,13 @@ const webCmd = feature('CCR_REMOTE_SETUP')
     ).default
   : null
 const clearSkillIndexCache = feature('EXPERIMENTAL_SKILL_SEARCH')
-  ? (
-      require('./services/skillSearch/localSearch.js') as typeof import('./services/skillSearch/localSearch.js')
-    ).clearSkillIndexCache
+  ? clearSkillIndexCacheValue
   : null
 const subscribePr = feature('KAIROS_GITHUB_WEBHOOKS')
   ? require('./commands/subscribe-pr.js').default
   : null
 const ultraplan = feature('ULTRAPLAN')
-  ? require('./commands/ultraplan.js').default
+  ? ultraplanValue
   : null
 const torch = feature('TORCH') ? require('./commands/torch.js').default : null
 const peersCmd = feature('UDS_INBOX')
@@ -119,11 +126,8 @@ const forkCmd = feature('FORK_SUBAGENT')
     ).default
   : null
 const buddy = feature('BUDDY')
-  ? (
-      require('./commands/buddy/index.js') as typeof import('./commands/buddy/index.js')
-    ).default
+  ? buddyValue
   : null
-/* eslint-enable @typescript-eslint/no-require-imports */
 import thinkback from './commands/thinkback/index.js'
 import thinkbackPlay from './commands/thinkback-play/index.js'
 import permissions from './commands/permissions/index.js'
@@ -405,13 +409,9 @@ async function getSkills(cwd: string): Promise<{
   }
 }
 
-/* eslint-disable @typescript-eslint/no-require-imports */
 const getWorkflowCommands = feature('WORKFLOW_SCRIPTS')
-  ? (
-      require('./tools/WorkflowTool/createWorkflowCommand.js') as typeof import('./tools/WorkflowTool/createWorkflowCommand.js')
-    ).getWorkflowCommands
+  ? getWorkflowCommandsValue
   : null
-/* eslint-enable @typescript-eslint/no-require-imports */
 
 /**
  * Filters commands by their declared `availability` (auth/provider requirement).

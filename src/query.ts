@@ -65,12 +65,14 @@ import {
   getAttachmentMessages,
   startRelevantMemoryPrefetch,
 } from './utils/attachments.js'
+import * as skillPrefetchValue from './services/skillSearch/prefetch.js'
+import * as jobClassifierValue from './jobs/classifier.js'
 /* eslint-disable @typescript-eslint/no-require-imports */
 const skillPrefetch = feature('EXPERIMENTAL_SKILL_SEARCH')
-  ? (require('./services/skillSearch/prefetch.js') as typeof import('./services/skillSearch/prefetch.js'))
+  ? skillPrefetchValue
   : null
 const jobClassifier = feature('TEMPLATES')
-  ? (require('./jobs/classifier.js') as typeof import('./jobs/classifier.js'))
+  ? jobClassifierValue
   : null
 /* eslint-enable @typescript-eslint/no-require-imports */
 import {
@@ -121,13 +123,14 @@ import {
   isLangfuseEnabled,
 } from './services/langfuse/index.js'
 import { getAPIProvider } from './utils/model/providers.js'
+import * as taskSummaryModuleValue from './utils/taskSummary.js'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const snipModule = feature('HISTORY_SNIP')
   ? (require('./services/compact/snipCompact.js') as typeof import('./services/compact/snipCompact.js'))
   : null
 const taskSummaryModule = feature('BG_SESSIONS')
-  ? (require('./utils/taskSummary.js') as typeof import('./utils/taskSummary.js'))
+  ? taskSummaryModuleValue
   : null
 /* eslint-enable @typescript-eslint/no-require-imports */
 

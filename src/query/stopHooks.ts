@@ -37,13 +37,15 @@ import {
 import type { SystemPrompt } from '../utils/systemPromptType.js'
 import { getTaskListId, listTasks } from '../utils/tasks.js'
 import { getAgentName, getTeamName, isTeammate } from '../utils/teammate.js'
+import * as extractMemoriesModuleValue from '../services/extractMemories/extractMemories.js'
+import * as jobClassifierModuleValue from '../jobs/classifier.js'
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const extractMemoriesModule = feature('EXTRACT_MEMORIES')
-  ? (require('../services/extractMemories/extractMemories.js') as typeof import('../services/extractMemories/extractMemories.js'))
+  ? extractMemoriesModuleValue
   : null
 const jobClassifierModule = feature('TEMPLATES')
-  ? (require('../jobs/classifier.js') as typeof import('../jobs/classifier.js'))
+  ? jobClassifierModuleValue
   : null
 
 /* eslint-enable @typescript-eslint/no-require-imports */

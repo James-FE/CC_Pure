@@ -84,6 +84,9 @@ export default defineConfig({
     copyPublicDir: false,
     sourcemap: false,
     minify: true,
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
 
     // SSR build mode — uses Rollup with Node.js target
     ssr: true,

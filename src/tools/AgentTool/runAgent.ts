@@ -27,6 +27,7 @@ import type {
 } from '../../services/mcp/types.js'
 import type { Tool, Tools, ToolUseContext } from '../../Tool.js'
 import { killShellTasksForAgent } from '../../tasks/LocalShellTask/killShellTasks.js'
+import { killMonitorMcpTasksForAgent } from '../../tasks/MonitorMcpTask/MonitorMcpTask.js'
 import type { Command } from '../../types/command.js'
 import type { AgentId } from '../../types/ids.js'
 import type {
@@ -872,17 +873,13 @@ export async function* runAgent({
     // `run_in_background` shell loop (e.g. test fixture fake-logs.sh) outlives
     // the agent as a PPID=1 zombie once the main session eventually exits.
     killShellTasksForAgent(agentId, toolUseContext.getAppState, rootSetAppState)
-    /* eslint-disable @typescript-eslint/no-require-imports */
     if (feature('MONITOR_TOOL')) {
-      const mcpMod =
-        require('../../tasks/MonitorMcpTask/MonitorMcpTask.js') as typeof import('../../tasks/MonitorMcpTask/MonitorMcpTask.js')
-      mcpMod.killMonitorMcpTasksForAgent(
+      killMonitorMcpTasksForAgent(
         agentId,
         toolUseContext.getAppState,
         rootSetAppState,
       )
     }
-    /* eslint-enable @typescript-eslint/no-require-imports */
   }
 }
 

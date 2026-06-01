@@ -324,16 +324,16 @@ import { isBgSession, updateSessionName, updateSessionActivity } from '../utils/
 import { isInProcessTeammateTask, type InProcessTeammateTaskState } from '../tasks/InProcessTeammateTask/types.js';
 import { restoreRemoteAgentTasks } from '../tasks/RemoteAgentTask/RemoteAgentTask.js';
 import { useInboxPoller } from '../hooks/useInboxPoller.js';
-// Dead code elimination: conditional import for loop mode
-/* eslint-disable @typescript-eslint/no-require-imports */
-const proactiveModule = feature('PROACTIVE') || feature('KAIROS') ? require('../proactive/index.js') : null;
+import * as proactiveModuleValue from '../proactive/index.js';
+import { useProactive as useProactiveValue } from '../proactive/useProactive.js';
+import { useScheduledTasks as useScheduledTasksValue } from '../hooks/useScheduledTasks.js';
+const proactiveModule = feature('PROACTIVE') || feature('KAIROS') ? proactiveModuleValue : null;
 const PROACTIVE_NO_OP_SUBSCRIBE = (_cb: () => void) => () => {};
 const PROACTIVE_FALSE = () => false;
 const SUGGEST_BG_PR_NOOP = (_p: string, _n: string): boolean => false;
 const useProactive =
-  feature('PROACTIVE') || feature('KAIROS') ? require('../proactive/useProactive.js').useProactive : null;
-const useScheduledTasks = feature('AGENT_TRIGGERS') ? require('../hooks/useScheduledTasks.js').useScheduledTasks : null;
-/* eslint-enable @typescript-eslint/no-require-imports */
+  feature('PROACTIVE') || feature('KAIROS') ? useProactiveValue : null;
+const useScheduledTasks = feature('AGENT_TRIGGERS') ? useScheduledTasksValue : null;
 import { isAgentSwarmsEnabled } from '../utils/agentSwarmsEnabled.js';
 import { useTaskListWatcher } from '../hooks/useTaskListWatcher.js';
 import type { SandboxAskCallback, NetworkHostPattern } from '../utils/sandbox/sandbox-adapter.js';
