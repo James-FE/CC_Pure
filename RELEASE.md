@@ -75,7 +75,18 @@ bun run build
 ccb          # 通过 ~/.local/bin/ccb wrapper 启动
 ```
 
-## 上游关系
+## 版本历史
+
+### v1.1.0 (2026-06-01)
+- 恢复 GrowthBook（feature flag 总线）
+- 合并 Langfuse（LLM 可观测性）
+- 启用 Auto Mode / Autonomy（自主执行）
+- 启用 Swarm / Coordinator（多 agent 调度）
+- 合入 4 个 P0 内存修复
+- 遥测防御改为环境变量控制（与上游 CCB 方案一致）
+
+### v1.0.0-pure (2026-06-01)
+- 初始发布：去遥测干净版 Claude Code
 
 - **上游**: [GhostDragon124/claude-code-best](https://github.com/GhostDragon124/claude-code-best) (CCB)
 - **分叉点**: `562e9daa`
