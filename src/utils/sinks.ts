@@ -13,5 +13,6 @@ import { initializeAnalyticsSink } from '../services/analytics/sink.js'
  */
 export function initSinks(): void {
   initializeErrorLogSink()
-  initializeAnalyticsSink()
+  // CC_Pure: Analytics sink 已永久禁用
+  // initializeAnalyticsSink()
 }

@@ -1,172 +1,84 @@
-# Claude Code Best V5 (CCB)
+# CC_Pure — Claude Code 纯净留影版本
 
-[![GitHub Stars](https://img.shields.io/github/stars/claude-code-best/claude-code?style=flat-square&logo=github&color=yellow)](https://github.com/claude-code-best/claude-code/stargazers)
-[![GitHub Contributors](https://img.shields.io/github/contributors/claude-code-best/claude-code?style=flat-square&color=green)](https://github.com/claude-code-best/claude-code/graphs/contributors)
-[![GitHub Issues](https://img.shields.io/github/issues/claude-code-best/claude-code?style=flat-square&color=orange)](https://github.com/claude-code-best/claude-code/issues)
-[![GitHub License](https://img.shields.io/github/license/claude-code-best/claude-code?style=flat-square)](https://github.com/claude-code-best/claude-code/blob/main/LICENSE)
-[![Last Commit](https://img.shields.io/github/last-commit/claude-code-best/claude-code?style=flat-square&color=blue)](https://github.com/claude-code-best/claude-code/commits/main)
 [![Bun](https://img.shields.io/badge/runtime-Bun-black?style=flat-square&logo=bun)](https://bun.sh/)
-[![Discord](https://img.shields.io/badge/Discord-Join-5865F2?style=flat-square&logo=discord)](https://discord.gg/qZU6zS7Q)
+[![GitHub License](https://img.shields.io/github/license/GhostDragon124/CC_Pure?style=flat-square)](./LICENSE)
 
-> Which Claude do you like? The open source one is the best.
+> 基于 [claude-code-best (CCB)](https://github.com/claude-code-best/claude-code) v2.1.888 的纯净留影版本。
+> 保留 CCB 全部功能，彻底移除所有 Anthropic 遥测上报。
 
-牢 A (Anthropic) 官方 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI 工具的源码反编译/逆向还原项目。目标是将 Claude Code 大部分功能及工程化能力复现 (问就是老佛爷已经付过钱了)。虽然很难绷, 但是它叫做 CCB(踩踩背)...
+---
 
-[文档在这里, 支持投稿 PR](https://ccb.agent-aura.top/) | [留影文档在这里](./Friends.md) | [Discord 群组](https://discord.gg/qZU6zS7Q)
+## 🙏 致谢
 
-- ✅ [x] V4 — 测试补全、[Buddy](https://ccb.agent-aura.top/docs/features/buddy)、[Auto Mode](https://ccb.agent-aura.top/docs/safety/auto-mode)、环境变量 Feature 开关
-- ✅ [x] V5 — [Sentry](https://ccb.agent-aura.top/docs/internals/sentry-setup) / [GrowthBook](https://ccb.agent-aura.top/docs/internals/growthbook-adapter) 企业监控、[自定义 Login](https://ccb.agent-aura.top/docs/features/custom-platform-login)、[OpenAI 兼容](https://ccb.agent-aura.top/docs/plans/openai-compatibility)、[Web Search](https://ccb.agent-aura.top/docs/features/web-browser-tool)、[Computer Use](https://ccb.agent-aura.top/docs/features/computer-use) / [Chrome Use](https://ccb.agent-aura.top/docs/features/claude-in-chrome-mcp)、[Voice Mode](https://ccb.agent-aura.top/docs/features/voice-mode)、[Bridge Mode](https://ccb.agent-aura.top/docs/features/bridge-mode)、[/dream 记忆整理](https://ccb.agent-aura.top/docs/features/auto-dream)
-- 🔮 [ ] V6 — 大规模重构石山代码，全面模块分包（全新分支，main 封存为历史版本）
+本项目是 [claude-code-best](https://github.com/claude-code-best/claude-code) 的 fork，**衷心感谢 CCB 项目全体作者的卓越贡献**。他们完成了 Claude Code 的反编译/逆向还原这一不可思议的工作，让社区得以学习、研究和自由使用。
 
-- 🚀 [想要启动项目](#快速开始源码版)
-- 🐛 [想要调试项目](#vs-code-调试)
-- 📖 [想要学习项目](#teach-me-学习项目)
+本项目在此基础上，进一步完成了 **Anthropic 遥测系统的彻底清除**，使其成为一个真正纯净的本地版本。
 
+---
 
-## ⚡ 快速开始(安装版)
+## 🔧 CC_Pure 的额外贡献
 
-不用克隆仓库, 从 NPM 下载后, 直接使用
+### 已清除的遥测系统
 
-```sh
-bun  i -g claude-code-best
-bun pm -g trust claude-code-best
-ccb # 直接打开 claude code
+| 系统 | 原行为 | 处理方式 |
+|------|--------|---------|
+| **Datadog 日志** | 向 Anthropic Datadog 上报事件 | 默认端点已清空 (CCB) |
+| **1P Event Logging** | 批量发送事件到 `api.anthropic.com` | 源码级永久禁用 |
+| **GrowthBook 远程配置** | 启动时连接 Anthropic 拉取 feature flags | 初始化代码已移除 |
+| **BigQuery Metrics** | 每 5 分钟上报 metrics | `isAnalyticsDisabled()` 永久返回 true |
+| **OpenTelemetry** | 三方遥测指标/日志/追踪 | 初始化入口已守卫 |
+| **Sentry** | 错误上报 | DSN 为空, no-op (CCB) |
+
+### 修改的文件（4 个）
+
+```
+src/services/analytics/config.ts   — isAnalyticsDisabled() 永久返回 true
+src/entrypoints/init.ts            — GrowthBook/1P/Telemetry 初始化已禁用
+src/main.tsx                       — Analytics gate 初始化已禁用
+src/utils/sinks.ts                 — Analytics sink 已禁用
 ```
 
-⚠️ 国内对 github 网络较差的, 需要先设置这个环境变量
+所有修改均标注 `// CC_Pure:` 注释，原代码保留以供参考。
 
-```bash
-DEFAULT_RELEASE_BASE=https://ghproxy.net/https://github.com/microsoft/ripgrep-prebuilt/releases/download/v15.0.1
-```
+详细审计报告见 [`docs/telemetry-cleanup-audit.md`](docs/telemetry-cleanup-audit.md)。
 
-## ⚡ 快速开始(源码版)
+---
 
-### ⚙️ 环境要求
+## ⚡ 快速开始
 
-一定要最新版本的 bun 啊, 不然一堆奇奇怪怪的 BUG!!! bun upgrade!!!
+### 环境要求
 
 - 📦 [Bun](https://bun.sh/) >= 1.3.11
-- ⚙️ 常规的配置 CC 的方式, 各大提供商都有自己的配置方式
 
-### 📥 安装
+### 安装与运行
 
 ```bash
 bun install
+bun run dev      # 开发模式
+bun run build    # 构建（产物输出到 dist/）
 ```
 
-⚠️ 国内对 github 网络较差的,可以使用这个环境变量
+### 配置 API
 
-```bash
-DEFAULT_RELEASE_BASE=https://ghproxy.net/https://github.com/microsoft/ripgrep-prebuilt/releases/download/v15.0.1
-```
+在 REPL 中输入 `/login`，选择 **Anthropic Compatible** 配置第三方 API：
 
-### ▶️ 运行
+| 字段 | 说明 |
+|------|------|
+| Base URL | API 地址 |
+| API Key | 认证密钥 |
+| Haiku / Sonnet / Opus Model | 模型 ID |
 
-```bash
-# 开发模式, 看到版本号 888 说明就是对了
-bun run dev
+配置保存到 `~/.claude/settings.json`。
 
-# 构建
-bun run build
-```
+---
 
-构建采用 code splitting 多文件打包（`build.ts`），产物输出到 `dist/` 目录（入口 `dist/cli.js` + 约 450 个 chunk 文件）。
+## 📖 原 CCB 文档
 
-构建出的版本 bun 和 node 都可以启动, 你 publish 到私有源可以直接启动
+- 在线文档：[ccb.agent-aura.top](https://ccb.agent-aura.top/)
+- DeepWiki：[deepwiki.com/claude-code-best/claude-code](https://deepwiki.com/claude-code-best/claude-code)
 
-如果遇到 bug 请直接提一个 issues, 我们优先解决
+---
 
-### 👤 新人配置 /login
-
-首次运行后，在 REPL 中输入 `/login` 命令进入登录配置界面，选择 **Anthropic Compatible** 即可对接第三方 API 兼容服务（无需 Anthropic 官方账号）。
-选择 OpenAI 和 Gemini 对应的栏目都是支持相应协议的
-
-需要填写的字段：
-
-| 📌 字段 | 📝 说明 | 💡 示例 |
-|------|------|------|
-| Base URL | API 服务地址 | `https://api.example.com/v1` |
-| API Key | 认证密钥 | `sk-xxx` |
-| Haiku Model | 快速模型 ID | `claude-haiku-4-5-20251001` |
-| Sonnet Model | 均衡模型 ID | `claude-sonnet-4-6` |
-| Opus Model | 高性能模型 ID | `claude-opus-4-6` |
-
-- ⌨️ **Tab / Shift+Tab** 切换字段，**Enter** 确认并跳到下一个，最后一个字段按 Enter 保存
-
-
-> ℹ️ 支持所有 Anthropic API 兼容服务（如 OpenRouter、AWS Bedrock 代理等），只要接口兼容 Messages API 即可。
-
-## Feature Flags
-
-所有功能开关通过 `FEATURE_<FLAG_NAME>=1` 环境变量启用，例如：
-
-```bash
-FEATURE_BUDDY=1 FEATURE_FORK_SUBAGENT=1 bun run dev
-```
-
-各 Feature 的详细说明见 [`docs/features/`](docs/features/) 目录，欢迎投稿补充。
-
-## VS Code 调试
-
-TUI (REPL) 模式需要真实终端，无法直接通过 VS Code launch 启动调试。使用 **attach 模式**：
-
-### 步骤
-
-1. **终端启动 inspect 服务**：
-   ```bash
-   bun run dev:inspect
-   ```
-   会输出类似 `ws://localhost:8888/xxxxxxxx` 的地址。
-
-2. **VS Code 附着调试器**：
-   - 在 `src/` 文件中打断点
-   - F5 → 选择 **"Attach to Bun (TUI debug)"**
-
-
-## Teach Me 学习项目
-
-我们新加了一个 teach-me skills, 通过问答式引导帮你理解这个项目的任何模块。(调整 [sigma skill 而来](https://github.com/sanyuan0704/sanyuan-skills))
-
-```bash
-# 在 REPL 中直接输入
-/teach-me Claude Code 架构
-/teach-me React Ink 终端渲染 --level beginner
-/teach-me Tool 系统 --resume
-```
-
-### 它能做什么
-
-- **诊断水平** — 自动评估你对相关概念的掌握程度，跳过已知的、聚焦薄弱的
-- **构建学习路径** — 将主题拆解为 5-15 个原子概念，按依赖排序逐步推进
-- **苏格拉底式提问** — 用选项引导思考，而非直接给答案
-- **错误概念追踪** — 发现并纠正深层误解
-- **断点续学** — `--resume` 从上次进度继续
-
-### 学习记录
-
-学习进度保存在 `.claude/skills/teach-me/` 目录下，支持跨主题学习者档案。
-
-## 相关文档及网站
-
-- **在线文档（Mintlify）**: [ccb.agent-aura.top](https://ccb.agent-aura.top/) — 文档源码位于 [`docs/`](docs/) 目录，欢迎投稿 PR
-- **DeepWiki**: <https://deepwiki.com/claude-code-best/claude-code>
-
-## Contributors
-
-<a href="https://github.com/claude-code-best/claude-code/graphs/contributors">
-  <img src="contributors.svg" alt="Contributors" />
-</a>
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=claude-code-best%2Fclaude-code&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=claude-code-best/claude-code&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=claude-code-best/claude-code&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=claude-code-best/claude-code&type=date&legend=top-left" />
- </picture>
-</a>
-
-## 许可证
+## ⚖️ 许可证
 
 本项目仅供学习研究用途。Claude Code 的所有权利归 [Anthropic](https://www.anthropic.com/) 所有。

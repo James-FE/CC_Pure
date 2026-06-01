@@ -688,7 +688,8 @@ export function startDeferredPrefetches(): void {
 	void countFilesRoundedRg(getCwd(), AbortSignal.timeout(3000), []);
 
 	// Analytics and feature flag initialization
-	void initializeAnalyticsGates();
+	// CC_Pure: Analytics gate 初始化已永久禁用
+	// void initializeAnalyticsGates();
 	void prefetchOfficialMcpUrls();
 
 	void refreshModelCapabilities();
