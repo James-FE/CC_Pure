@@ -2,7 +2,8 @@
 // Performance shim MUST be the first import — it replaces globalThis.performance
 // with a JS-backed implementation before React/OTel capture the native reference.
 // Without this, JSC's C++ Vector grows without bound in long-running sessions.
-import '../utils/performanceShim.js';
+// CC_Pure: performanceShim and ACP entry not needed
+// import '../utils/performanceShim.js';
 import { feature } from 'bun:bundle';
 import { isEnvTruthy } from '../utils/envUtils.js';
 
@@ -120,13 +121,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Fast-path for `--acp` — ACP (Agent Client Protocol) agent mode over stdio.
-  if (feature('ACP') && process.argv[2] === '--acp') {
-    profileCheckpoint('cli_acp_path');
-    const { runAcpAgent } = await import('../services/acp/entry.js');
-    await runAcpAgent();
-    return;
-  }
+  // CC_Pure: ACP feature not included — commented out
+  // if (feature('ACP') && process.argv[2] === '--acp') {
+  //   profileCheckpoint('cli_acp_path');
+  //   const { runAcpAgent } = await import('../services/acp/entry.js');
+  //   await runAcpAgent();
+  //   return;
+  // }
 
   if (args[0] === 'weixin') {
     profileCheckpoint('cli_weixin_path');
