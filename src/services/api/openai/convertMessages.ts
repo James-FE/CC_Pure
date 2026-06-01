@@ -250,9 +250,13 @@ function convertInternalAssistantMessage(
         },
       })
     } else if (block.type === 'thinking' && preserveReasoning) {
-      // DeepSeek thinking mode: preserve reasoning_content for tool call iterations
+      // DeepSeek thinking mode: always preserve reasoning_content,
+      // including the empty-string case. DeepSeek v4 may return
+      // reasoning_content: "" when the model answers directly, and the
+      // empty value must be echoed back in the next request — otherwise
+      // DeepSeek returns 400 ("reasoning_content ... must be passed back").
       const thinkingText = (block as Record<string, unknown>).thinking
-      if (typeof thinkingText === 'string' && thinkingText) {
+      if (typeof thinkingText === 'string') {
         reasoningParts.push(thinkingText)
       }
     }
