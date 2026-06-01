@@ -150,6 +150,7 @@ import sandboxToggle from './commands/sandbox-toggle/index.js'
 import chrome from './commands/chrome/index.js'
 import stickers from './commands/stickers/index.js'
 import advisor from './commands/advisor.js'
+import autonomy from './commands/autonomy.js'
 import provider from './commands/provider.js'
 import { logError } from './utils/log.js'
 import { toError } from './utils/errors.js'
@@ -258,6 +259,7 @@ export const INTERNAL_ONLY_COMMANDS = [
 const COMMANDS = memoize((): Command[] => [
   addDir,
   advisor,
+  autonomy,
   provider,
   agents,
   branch,
