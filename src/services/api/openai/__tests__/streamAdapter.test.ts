@@ -407,7 +407,8 @@ describe('prompt caching support', () => {
 
     const msgStart = events.find(e => e.type === 'message_start') as any
     expect(msgStart.message.usage.cache_read_input_tokens).toBe(800)
-    expect(msgStart.message.usage.input_tokens).toBe(1000)
+    // Anthropic convention: input_tokens = non-cached only (prompt_tokens - cached)
+    expect(msgStart.message.usage.input_tokens).toBe(200)
   })
 
   test('defaults cache_read_input_tokens to 0 when no cached_tokens', async () => {

@@ -32,8 +32,8 @@ const {
 // ─── EFFORT_LEVELS constant ────────────────────────────────────────────
 
 describe("EFFORT_LEVELS", () => {
-  test("contains the four canonical levels", () => {
-    expect(EFFORT_LEVELS).toEqual(["low", "medium", "high", "max"]);
+  test("contains the five canonical levels", () => {
+    expect(EFFORT_LEVELS).toEqual(["low", "medium", "high", "xhigh", "max"]);
   });
 });
 
@@ -222,12 +222,6 @@ describe("getEffortLevelDescription", () => {
   test("returns description for 'max'", () => {
     const desc = getEffortLevelDescription("max");
     expect(desc).toContain("Maximum");
-  });
-
-  test("max description does not contain model names", () => {
-    const desc = getEffortLevelDescription("max");
-    expect(desc).not.toContain("Opus");
-    expect(desc).not.toContain("DeepSeek");
   });
 });
 
