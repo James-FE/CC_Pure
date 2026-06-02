@@ -13,7 +13,7 @@ export class KeychainUnavailableError extends Error {
   }
 }
 
-const unavailable = () => {
+const unavailable = (..._args: unknown[]) => {
   throw new KeychainUnavailableError()
 }
 
@@ -24,4 +24,11 @@ export const tryKeychain = {
   list: unavailable,
   _addToIndex: unavailable,
   _removeFromIndex: unavailable,
+} as {
+  set(key: string, value: string): Promise<void>
+  get(key: string): Promise<string | undefined>
+  delete(key: string): Promise<boolean>
+  list(): Promise<string[]>
+  _addToIndex(key: string): Promise<void>
+  _removeFromIndex(key: string): Promise<void>
 }

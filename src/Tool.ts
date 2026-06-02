@@ -70,6 +70,7 @@ export type {
   SkillToolProgress,
   TaskOutputProgress,
   WebSearchProgress,
+  ToolResultBlockParam,
 }
 
 import type { SpinnerMode } from './components/Spinner.js'

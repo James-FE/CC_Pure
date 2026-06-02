@@ -111,3 +111,25 @@ export const COORDINATOR_MODE_ALLOWED_TOOLS = new Set([
   SEND_MESSAGE_TOOL_NAME,
   SYNTHETIC_OUTPUT_TOOL_NAME,
 ])
+
+/**
+ * Core tools that are always loaded and available in every session.
+ * These appear directly in the tool list — agents call them without SearchExtraTools.
+ */
+export const CORE_TOOLS = new Set<string>([
+  FILE_READ_TOOL_NAME,
+  FILE_EDIT_TOOL_NAME,
+  FILE_WRITE_TOOL_NAME,
+  GREP_TOOL_NAME,
+  GLOB_TOOL_NAME,
+  WEB_SEARCH_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  SKILL_TOOL_NAME,
+  TODO_WRITE_TOOL_NAME,
+  AGENT_TOOL_NAME,
+  TASK_CREATE_TOOL_NAME,
+  TASK_GET_TOOL_NAME,
+  TASK_LIST_TOOL_NAME,
+  TASK_UPDATE_TOOL_NAME,
+  ...SHELL_TOOL_NAMES,
+])
