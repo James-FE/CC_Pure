@@ -20,7 +20,7 @@ const result = await Bun.build({
   entrypoints: ['src/entrypoints/cli.tsx'],
   outdir,
   target: 'bun',
-  splitting: false,
+  splitting: true,
   define: getMacroDefines(),
   features,
 })
