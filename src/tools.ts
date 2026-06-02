@@ -132,13 +132,10 @@ const SnipTool = feature('HISTORY_SNIP')
 const ListPeersTool = feature('UDS_INBOX')
   ? require('./tools/ListPeersTool/ListPeersTool.js').ListPeersTool
   : null
-// Lazy getter to defer chunk loading — IIFE causes code-split deadlock
-const getWorkflowTool = () => {
-  if (!feature('WORKFLOW_SCRIPTS')) return null
-  require('@claude-code-best/builtin-tools/tools/WorkflowTool/bundled/index.js').initBundledWorkflows()
-  return require('@claude-code-best/builtin-tools/tools/WorkflowTool/WorkflowTool.js')
-    .WorkflowTool
-}
+const WorkflowTool = feature('WORKFLOW_SCRIPTS')
+  ? require('@claude-code-best/builtin-tools/tools/WorkflowTool/WorkflowTool.js')
+      .WorkflowTool
+  : null
 /* eslint-enable custom-rules/no-process-env-top-level, @typescript-eslint/no-require-imports */
 import type { ToolPermissionContext } from './Tool.js'
 import { getDenyRuleForTool } from './utils/permissions/permissions.js'
@@ -237,7 +234,7 @@ export function getAllBaseTools(): Tools {
       : []),
     ...(VerifyPlanExecutionTool ? [VerifyPlanExecutionTool] : []),
     ...(process.env.USER_TYPE === 'ant' && REPLTool ? [REPLTool] : []),
-    ...(() => { const w = getWorkflowTool(); return w ? [w] : [] })(),
+    ...(WorkflowTool ? [WorkflowTool] : []),
     ...(SleepTool ? [SleepTool] : []),
     ...cronTools,
     ...(RemoteTriggerTool ? [RemoteTriggerTool] : []),

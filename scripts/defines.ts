@@ -59,7 +59,7 @@ export const DEFAULT_BUILD_FEATURES = [
   'PROACTIVE', // 主动自主代理模式（SleepTool 控制 tick 节奏，省 token）
   'DAEMON', // 守护进程模式，长驻 supervisor 管理后台 worker（非 GB 级主因）
   'ACP', // ACP 代理协议，支持外部 agent 接入
-  // 'WORKFLOW_SCRIPTS', // 已禁用：lazy getter 在 splitting:true 下仍触发 chunk 死锁，待进一步排查
+  // 'WORKFLOW_SCRIPTS', // 已禁用：top-level require() 在 splitting:true 下仍触发 chunk 循环死锁——WorkflowTool chunk 依赖图过深
   // 'HISTORY_SNIP', // 已禁用：snip 功能暂时关闭
   // 'CONTEXT_COLLAPSE', // 已禁用：实现是空壳 stub，启用后会抑制 auto compact 导致上下文管理完全失效
   'MONITOR_TOOL', // 已修复：require() 迁移后 splitting:true 不再触发 __esm() 死锁
