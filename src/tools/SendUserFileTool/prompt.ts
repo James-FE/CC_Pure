@@ -1,3 +1,3 @@
-// Auto-generated stub — replace with real implementation
+// Stub — SendUserFile tool name (KAIROS assistant mode)
 export {};
-export const SEND_USER_FILE_TOOL_NAME: string = '';
+export const SEND_USER_FILE_TOOL_NAME: string = 'SendUserFile';
