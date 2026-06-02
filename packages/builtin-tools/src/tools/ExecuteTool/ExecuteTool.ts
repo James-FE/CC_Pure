@@ -7,6 +7,7 @@ import {
   type ToolUseContext,
   type ToolResult,
   type Tools,
+  type ValidationResult,
 } from 'src/Tool.js'
 import { lazySchema } from 'src/utils/lazySchema.js'
 import { createUserMessage } from 'src/utils/messages.js'
@@ -137,7 +138,7 @@ export const ExecuteTool = buildTool({
           },
           newMessages: [
             createUserMessage({
-              content: `Invalid parameters for tool "${input.tool_name}": ${validation.message}`,
+              content: `Invalid parameters for tool "${input.tool_name}": ${(validation as ValidationResult & { message: string }).message}`,
             }),
           ],
         }

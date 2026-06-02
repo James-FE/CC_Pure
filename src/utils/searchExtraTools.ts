@@ -9,16 +9,16 @@ export function isSearchExtraToolsEnabledOptimistic(): boolean {
   return false
 }
 
-/** Check if SearchExtraTools tool is available. */
-export function isSearchExtraToolsToolAvailable(): boolean {
+/** Check if SearchExtraTools tool is available in the given tool list. */
+export function isSearchExtraToolsToolAvailable(_tools: unknown): boolean {
   return false
 }
 
-/** Extract discovered tool names from a search result. */
+/** Extract discovered tool names from conversation messages. */
 export function extractDiscoveredToolNames(
-  _result: unknown,
-): string[] {
-  return []
+  _messages: unknown[],
+): Set<string> {
+  return new Set()
 }
 
 /** Search for deferred tools by query string. */
