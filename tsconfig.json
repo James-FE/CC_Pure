@@ -1,5 +1,4 @@
 {
-  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
@@ -23,7 +22,9 @@
       "@claude-code-best/agent-tools/*": ["./packages/agent-tools/src/*"],
       "@claude-code-best/agent-tools": ["./packages/agent-tools/src/index.ts"],
       "@claude-code-best/weixin/*": ["./packages/weixin/src/*"],
-      "@claude-code-best/weixin": ["./packages/weixin/src/index.ts"]
+      "@claude-code-best/weixin": ["./packages/weixin/src/index.ts"],
+      "@ant/model-provider": ["./packages/@ant/model-provider/src/index.ts"],
+      "@ant/model-provider/*": ["./packages/@ant/model-provider/src/*"]
     }
   },
   "include": [
@@ -32,5 +33,5 @@
     "packages/**/*.ts",
     "packages/**/*.tsx"
   ],
-  "exclude": ["node_modules", "packages/remote-control-server/web"]
+  "exclude": ["node_modules", "dist"]
 }
