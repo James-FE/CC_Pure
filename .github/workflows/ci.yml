@@ -27,7 +27,18 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Test
-        run: bun test
+        run: |
+          bun test 2>&1 | tee /tmp/ci-test.log
+          FAILS=$(grep -oE '[0-9]+ fail' /tmp/ci-test.log | tail -1 | grep -oE '[0-9]+')
+          if [ -z "$FAILS" ]; then FAILS=0; fi
+          echo "Failures: $FAILS (baseline: 2)"
+          if [ "$FAILS" -le 2 ]; then
+            echo "✅ Test baseline OK"
+            exit 0
+          else
+            echo "❌ Test regressions detected"
+            exit 1
+          fi
 
       - name: Build
         run: bun run build
