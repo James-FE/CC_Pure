@@ -51,6 +51,7 @@ import { isFsInaccessible } from '../../utils/errors.js'
 import { gracefulShutdown } from '../../utils/gracefulShutdown.js'
 import { safeParseJSON } from '../../utils/json.js'
 import { getPlatform } from '../../utils/platform.js'
+import { redactUrl, redactValue } from '../../utils/sensitive.js'
 import { cliError, cliOk } from '../exit.js'
 
 async function checkMcpServerHealth(
@@ -214,13 +215,13 @@ export async function mcpListHandler(): Promise<void> {
       // Intentionally excluding sse-ide servers here since they're internal
       if (server.type === 'sse') {
         // biome-ignore lint/suspicious/noConsole:: intentional console output
-        console.log(`${name}: ${server.url} (SSE) - ${status}`)
+        console.log(`${name}: ${redactUrl(server.url)} (SSE) - ${status}`)
       } else if (server.type === 'http') {
         // biome-ignore lint/suspicious/noConsole:: intentional console output
-        console.log(`${name}: ${server.url} (HTTP) - ${status}`)
+        console.log(`${name}: ${redactUrl(server.url)} (HTTP) - ${status}`)
       } else if (server.type === 'claudeai-proxy') {
         // biome-ignore lint/suspicious/noConsole:: intentional console output
-        console.log(`${name}: ${server.url} - ${status}`)
+        console.log(`${name}: ${redactUrl(server.url)} - ${status}`)
       } else if (!server.type || server.type === 'stdio') {
         const stdioServer = server as { command: string; args: string[]; type?: string }
         const args = Array.isArray(stdioServer.args) ? stdioServer.args : []
@@ -259,13 +260,13 @@ export async function mcpGetHandler(name: string): Promise<void> {
     // biome-ignore lint/suspicious/noConsole:: intentional console output
     console.log(`  Type: sse`)
     // biome-ignore lint/suspicious/noConsole:: intentional console output
-    console.log(`  URL: ${server.url}`)
+    console.log(`  URL: ${redactUrl(server.url)}`)
     if (server.headers) {
       // biome-ignore lint/suspicious/noConsole:: intentional console output
       console.log('  Headers:')
       for (const [key, value] of Object.entries(server.headers)) {
         // biome-ignore lint/suspicious/noConsole:: intentional console output
-        console.log(`    ${key}: ${value}`)
+        console.log(`    ${redactValue(key)}: ${redactValue(key, value)}`)
       }
     }
     if (server.oauth?.clientId || server.oauth?.callbackPort) {
@@ -284,13 +285,13 @@ export async function mcpGetHandler(name: string): Promise<void> {
     // biome-ignore lint/suspicious/noConsole:: intentional console output
     console.log(`  Type: http`)
     // biome-ignore lint/suspicious/noConsole:: intentional console output
-    console.log(`  URL: ${server.url}`)
+    console.log(`  URL: ${redactUrl(server.url)}`)
     if (server.headers) {
       // biome-ignore lint/suspicious/noConsole:: intentional console output
       console.log('  Headers:')
       for (const [key, value] of Object.entries(server.headers)) {
         // biome-ignore lint/suspicious/noConsole:: intentional console output
-        console.log(`    ${key}: ${value}`)
+        console.log(`    ${redactValue(key)}: ${redactValue(key, value)}`)
       }
     }
     if (server.oauth?.clientId || server.oauth?.callbackPort) {
@@ -318,7 +319,7 @@ export async function mcpGetHandler(name: string): Promise<void> {
       console.log('  Environment:')
       for (const [key, value] of Object.entries(server.env)) {
         // biome-ignore lint/suspicious/noConsole:: intentional console output
-        console.log(`    ${key}=${value}`)
+        console.log(`    ${redactValue(key)}=${redactValue(key, value)}`)
       }
     }
   }

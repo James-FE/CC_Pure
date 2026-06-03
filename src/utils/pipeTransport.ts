@@ -262,12 +262,13 @@ export class PipeServer extends EventEmitter {
    */
   private async startTcpServer(port: number): Promise<void> {
     return new Promise<void>((resolve, reject) => {
+      const host = process.env.PIPE_HOST || '127.0.0.1'
       this.tcpServer = createServer(socket => this.setupSocket(socket))
       this.tcpServer.on('error', reject)
-      this.tcpServer.listen(port, '0.0.0.0', () => {
+      this.tcpServer.listen(port, host, () => {
         const addr = this.tcpServer!.address()
         if (addr && typeof addr === 'object') {
-          this._tcpAddress = { host: '0.0.0.0', port: addr.port }
+          this._tcpAddress = { host, port: addr.port }
         }
         resolve()
       })

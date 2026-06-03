@@ -25,10 +25,25 @@ import webEnvironments from "./routes/web/environments";
 console.log("[RCS] In-memory store ready (no SQLite)");
 
 const app = new Hono();
+const port = config.port;
+const host = config.host;
+
+const allowedWebOrigins = [
+  `http://localhost:${port}`,
+  `http://127.0.0.1:${port}`,
+  config.baseUrl,
+].filter(Boolean);
 
 // Middleware
 app.use("*", logger());
-app.use("/web/*", cors());
+app.use(
+  "/web/*",
+  cors({
+    origin: (origin) =>
+      allowedWebOrigins.includes(origin) ? origin : undefined,
+    credentials: true,
+  }),
+);
 
 // Health check
 app.get("/health", (c) => c.json({ status: "ok", version: config.version }));
@@ -69,9 +84,6 @@ app.route("/web", webAuth);
 app.route("/web", webSessions);
 app.route("/web", webControl);
 app.route("/web", webEnvironments);
-
-const port = config.port;
-const host = config.host;
 
 console.log(`[RCS] Remote Control Server starting on ${host}:${port}`);
 console.log("[RCS] API key configuration loaded");

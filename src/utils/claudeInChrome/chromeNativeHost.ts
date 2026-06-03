@@ -20,6 +20,7 @@ import { homedir, platform } from 'os'
 import { join } from 'path'
 import { z } from 'zod'
 import { lazySchema } from '../lazySchema.js'
+import { redactForLog } from '../sensitive.js'
 import { jsonParse, jsonStringify } from '../slowOperations.js'
 import { getSecureSocketPath, getSocketDir } from './common.js'
 
@@ -32,17 +33,18 @@ const LOG_FILE =
     : undefined
 
 function log(message: string, ...args: unknown[]): void {
+  const redactedMessage = redactForLog(message)
   if (LOG_FILE) {
     const timestamp = new Date().toISOString()
     const formattedArgs = args.length > 0 ? ' ' + jsonStringify(args) : ''
-    const logLine = `[${timestamp}] [Claude Chrome Native Host] ${message}${formattedArgs}\n`
+    const logLine = `[${timestamp}] [Claude Chrome Native Host] ${redactedMessage}${formattedArgs}\n`
     // Fire-and-forget: logging is best-effort and callers (including event
     // handlers) don't await
     void appendFile(LOG_FILE, logLine).catch(() => {
       // Ignore file write errors
     })
   }
-  console.error(`[Claude Chrome Native Host] ${message}`, ...args)
+  console.error(`[Claude Chrome Native Host] ${redactedMessage}`, ...args)
 }
 /**
  * Send a message to stdout (Chrome native messaging protocol)
