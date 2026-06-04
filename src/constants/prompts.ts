@@ -7,7 +7,8 @@ import { getIsNonInteractiveSession } from '../bootstrap/state.js'
 import { getCurrentWorktreeSession } from '../utils/worktree.js'
 import { getSessionStartDate } from './common.js'
 import { getInitialSettings } from '../utils/settings/settings.js'
-import { isPoorModeActive } from '../commands/poor/poorMode.js'
+// Stub: poor mode removed from CCP
+const isPoorModeActive = () => false
 import {
   AGENT_TOOL_NAME,
   VERIFICATION_AGENT_TYPE,

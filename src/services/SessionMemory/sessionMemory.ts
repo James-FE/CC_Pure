@@ -281,10 +281,10 @@ const extractSessionMemory = sequential(async function (
     return
   }
 
-  // Poor mode: skip to reduce token consumption
+  // Poor mode: skip to reduce token consumption (stubbed — poor mode removed from CCP)
   if (feature('POOR')) {
-    const { isPoorModeActive } = await import('../../commands/poor/poorMode.js')
-    if (isPoorModeActive()) return
+    // isPoorModeActive stub — poor/poorMode.js not present in CCP
+    return
   }
 
   // Check gate lazily when hook runs (cached, non-blocking)
