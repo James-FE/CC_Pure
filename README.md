@@ -83,10 +83,9 @@ CC Pure 基于 CCB v2.6.6 反编译源码，做了以下核心变更：
 | v2.1.0 | 2026-06-04 | 2 | REVIEW 24 执行完毕 |
 | v2.0.0 | 2026-06-04 | 12 | P3 A 完成 |
 | v1.8.0 | 2026-06-04 | 23 | P2 完成 |
-| acp | 2026-06 | 5 | ACP 社区功能全量引入：bridge、permissions、session 管理、acp-link manager |
 | ... | 2026-06 | 10 | P0/P1 + 基础设施同步 |
 
-> **累计**：180 个候选 commit 全量审查 → ✅ 52 MERGE / 🟡 34 已存在 / ❌ 94 SKIP。ACP 功能在 [acp 分支](https://github.com/GhostDragon124/CC_Pure/tree/acp) 维护。
+> **累计**：180 个候选 commit 全量审查 → ✅ 52 MERGE / 🟡 34 已存在 / ❌ 94 SKIP。
 > 详见本地文档 `~/文档/User_manual/CC_Pure_代码分析/CC_Pure_update_record/`。
 
 ### 移除的企业全家桶
@@ -121,7 +120,7 @@ tail -f ~/.claude/local_analytics.jsonl
 | BRIDGE_MODE | ✅ | WebSocket 远程控制 |
 | DAEMON | ✅ | 守护进程 + 后台 worker |
 | ULTRATHINK | ✅ | 扩展深度推理 |
-| ACP | ✅ | 外部 Agent 协议 — 已从上游 CCB 引入 [acp 分支](https://github.com/GhostDragon124/CC_Pure/tree/acp)，含 bridge / permissions / session / acp-link manager |
+| ACP | ✅ | 外部 Agent 协议 — 已从上游 CCB 引入，含 bridge / permissions / session / acp-link manager |
 | VOICE_MODE | ✅ | 语音输入 |
 | KAIROS | ✅ | 定时任务系统 |
 | PROACTIVE | ✅ | 自主代理模式 |
