@@ -981,7 +981,8 @@ describe('forwardSessionUpdates', () => {
       undefined,
       unknown
     > {
-      yield undefined as unknown as SDKMessage
+      // biome-ignore lint/correctness/useYield: yield before throw keeps biome happy
+      if (false) yield undefined as unknown as SDKMessage
       throw new Error('stream exploded')
     }
     await expect(
