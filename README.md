@@ -92,7 +92,7 @@ CC Pure 基于 CCB v2.6.6 反编译源码，做了以下核心变更：
 
 | 组件 | 状态 | 说明 |
 |------|:---:|------|
-| Sentry 错误追踪 | ❌ 移除 | 数据上报第三方，CCP 无此集成 |
+| Sentry 错误追踪 | 🟡 休眠 | 代码保留（`src/utils/sentry.ts`），设 `SENTRY_DSN` 即激活，支持自托管 Docker 或 sentry.io Cloud |
 | Pipe IPC / LAN Pipes | ❌ 禁用 | 多机编排，个人使用不需要 |
 | UDS_INBOX | ❌ 禁用 | 进程间通信管道，Node.js 环境卡死 |
 | Anthropic 遥测上报 | ❌ 阻断 | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` 启动层拦截 |
