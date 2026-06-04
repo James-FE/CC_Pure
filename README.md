@@ -77,6 +77,8 @@ CC Pure 基于 CCB v2.6.6 反编译源码，做了以下核心变更：
 
 | 版本 | 日期 | 合并数 | 说明 |
 |------|------|:------:|------|
+| v2.2.2 | 2026-06-04 | 16 文件 | **Autonomy 全量合并**：f2e9af49 PR #386 源码 + 11 测试文件，3699 pass |
+| v2.2.1 | 2026-06-04 | 2 | OpenAI fixes backfill：c82f5994 (stop_reason/usage/max_tokens) + 901628b4 (MCP 工具可见性) |
 | v2.2.0 | 2026-06-04 | 2 | Batch 1a 安全加固 + ad09f38f 斜杠补全 |
 | v2.1.0 | 2026-06-04 | 2 | REVIEW 24 执行完毕 |
 | v2.0.0 | 2026-06-04 | 12 | P3 A 完成 |
@@ -133,7 +135,7 @@ tail -f ~/.claude/local_analytics.jsonl
 | 指标 | CCB 基线 | CC Pure 当前 | 提升 |
 |------|:--------:|:----------:|:----:|
 | tsc 错误 | 62 | **0** | ✅ |
-| 测试通过 | 3007 | **3383** | +376 |
+| 测试通过 | 3007 | **3699** | +692 |
 | 构建 | 不稳定 | **稳定（splitting: true）** | ✅ |
 | 遥测外连 | 有 | **0** | ✅ |
 | CodeQL open | 175+ | **0** | ✅ |
@@ -160,7 +162,7 @@ tail -f ~/.claude/local_analytics.jsonl
 bun install
 bun run dev           # 开发模式（默认全 feature 开启）
 bun run build         # 生产构建
-bun test              # 3383 tests
+bun test              # 3699 tests
 ```
 
 ---
