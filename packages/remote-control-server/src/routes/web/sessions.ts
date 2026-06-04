@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { uuidAuth } from "../../auth/middleware";
+import { getAutomationStateSnapshot } from "../../services/automationState";
 import {
   createSession,
   getSession,
@@ -9,7 +10,7 @@ import {
   resolveOwnedWebSessionId,
   toWebSessionResponse,
 } from "../../services/session";
-import { storeBindSession } from "../../store";
+import { storeBindSession, storeGetSessionWorker } from "../../store";
 import { createWorkItem } from "../../services/work-dispatch";
 import { createSSEStream } from "../../transport/sse-writer";
 import { getEventBus } from "../../transport/event-bus";
@@ -67,7 +68,13 @@ app.get("/sessions/:id", uuidAuth, async (c) => {
   if (!session) {
     return c.json({ error: { type: "not_found", message: "Session not found" } }, 404);
   }
-  return c.json(toWebSessionResponse(session), 200);
+  const worker = storeGetSessionWorker(sessionId);
+  const automationState = getAutomationStateSnapshot(worker?.externalMetadata);
+  const response = toWebSessionResponse(session);
+  return c.json(
+    automationState === undefined ? response : { ...response, automation_state: automationState },
+    200,
+  );
 });
 
 /** GET /web/sessions/:id/history — Historical events for session */
@@ -103,7 +110,7 @@ app.get("/sessions/:id/events", uuidAuth, async (c) => {
   }
 
   const lastEventId = c.req.header("Last-Event-ID");
-  const fromSeqNum = lastEventId ? parseInt(lastEventId) : 0;
+  const fromSeqNum = lastEventId ? parseInt(lastEventId, 10) : 0;
   return createSSEStream(c, sessionId, fromSeqNum);
 });
 

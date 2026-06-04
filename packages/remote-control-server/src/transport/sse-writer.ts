@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import type { SessionEvent } from "./event-bus";
 import { getEventBus } from "./event-bus";
+import { toClientPayload } from "./client-payload";
 
 export interface SSEWriter {
   send(event: SessionEvent): void;
@@ -117,6 +118,15 @@ export function createSSEStream(c: Context, sessionId: string, fromSeqNum = 0) {
 }
 
 function toWorkerClientPayload(event: SessionEvent): Record<string, unknown> {
+  if (
+    event.type === "permission_response" ||
+    event.type === "control_response" ||
+    event.type === "control_request" ||
+    event.type === "interrupt"
+  ) {
+    return toClientPayload(event);
+  }
+
   const normalized =
     event.payload && typeof event.payload === "object"
       ? (event.payload as Record<string, unknown>)
