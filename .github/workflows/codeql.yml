@@ -33,6 +33,8 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
+        env:
+          CLAUDE_CODE_SKIP_CHROME_MCP_SETUP: '1'
         run: bun install
 
       - name: Initialize CodeQL
