@@ -351,7 +351,9 @@ function ModeIndicator({
     // its click-target Box isn't nested inside the <Text wrap="truncate">
     // wrapper (reconciler throws on Box-in-Text).
     // Tmux pill (ant-only) — appears right after tasks in nav order
-    ...(process.env.USER_TYPE === 'ant' && hasTmuxSession ? [<TungstenPill key="tmux" selected={tmuxSelected} />] : []),
+    ...(process.env.USER_TYPE === 'ant' && hasTmuxSession && typeof TungstenPill === 'function'
+      ? [<TungstenPill key="tmux" selected={tmuxSelected} />]
+      : []),
     ...(isAgentSwarmsEnabled() && hasTeams
       ? [<TeamStatus key="teams" teamsSelected={teamsSelected} showHint={showHint && !hasBackgroundTasks} />]
       : []),
