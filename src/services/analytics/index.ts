@@ -66,6 +66,17 @@ type QueuedEvent = {
   async: boolean
 }
 
+function writeLocalAnalyticsEvent(
+  eventName: string,
+  metadata: LogEventMetadata,
+): void {
+  // Local analytics stays independent of the optional upstream sinks.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { writeLocalEvent } =
+    require('./localSink.js') as typeof import('./localSink.js')
+  writeLocalEvent(eventName, metadata as Record<string, unknown>)
+}
+
 /**
  * Sink interface for the analytics backend
  */
@@ -136,13 +147,7 @@ export function logEvent(
   // to avoid accidentally logging code/filepaths
   metadata: LogEventMetadata,
 ): void {
-  // Local analytics: write EVERY event to a local JSONL file for self-analysis.
-  // Runs before the upstream sink so local data is never lost even if the
-  // upstream sink throws. Import is inline to avoid adding a module-level
-  // dependency to this zero-dependency entry point.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { writeLocalEvent } = require('./localSink.js') as typeof import('./localSink.js')
-  writeLocalEvent(eventName, metadata as Record<string, unknown>)
+  writeLocalAnalyticsEvent(eventName, metadata)
 
   if (sink === null) {
     eventQueue.push({ eventName, metadata, async: false })
@@ -164,6 +169,8 @@ export async function logEventAsync(
   // intentionally no strings, to avoid accidentally logging code/filepaths
   metadata: LogEventMetadata,
 ): Promise<void> {
+  writeLocalAnalyticsEvent(eventName, metadata)
+
   if (sink === null) {
     eventQueue.push({ eventName, metadata, async: true })
     return

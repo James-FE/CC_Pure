@@ -44,8 +44,6 @@ export class BigQueryMetricsExporter implements PushMetricExporter {
   private isShutdown = false
 
   constructor(options: { timeout?: number } = {}) {
-    const defaultEndpoint = 'https://api.anthropic.com/api/claude_code/metrics'
-
     if (
       process.env.USER_TYPE === 'ant' &&
       process.env.ANT_CLAUDE_CODE_METRICS_ENDPOINT
@@ -54,7 +52,7 @@ export class BigQueryMetricsExporter implements PushMetricExporter {
         process.env.ANT_CLAUDE_CODE_METRICS_ENDPOINT +
         '/api/claude_code/metrics'
     } else {
-      this.endpoint = defaultEndpoint
+      this.endpoint = ''
     }
 
     this.timeout = options.timeout || 5000
@@ -88,6 +86,11 @@ export class BigQueryMetricsExporter implements PushMetricExporter {
     metrics: ResourceMetrics,
     resultCallback: (result: ExportResult) => void,
   ): Promise<void> {
+    if (!this.endpoint) {
+      resultCallback({ code: ExportResultCode.SUCCESS })
+      return
+    }
+
     try {
       // Skip if trust not established in interactive mode
       // This prevents triggering apiKeyHelper before trust dialog

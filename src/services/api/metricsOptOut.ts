@@ -42,7 +42,12 @@ async function _fetchMetricsEnabled(): Promise<MetricsEnabledResponse> {
     ...authResult.headers,
   }
 
-  const endpoint = `https://api.anthropic.com/api/claude_code/organizations/metrics_enabled`
+  const metricsBaseUrl = process.env.ANT_CLAUDE_CODE_METRICS_ENDPOINT
+  if (!metricsBaseUrl) {
+    throw new Error('Metrics endpoint is not configured')
+  }
+
+  const endpoint = `${metricsBaseUrl}/api/claude_code/organizations/metrics_enabled`
   const response = await axios.get<MetricsEnabledResponse>(endpoint, {
     headers,
     timeout: 5000,
