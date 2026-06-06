@@ -281,12 +281,6 @@ const extractSessionMemory = sequential(async function (
     return
   }
 
-  // Poor mode: skip to reduce token consumption (stubbed — poor mode removed from CCP)
-  if (feature('POOR')) {
-    // isPoorModeActive stub — poor/poorMode.js not present in CCP
-    return
-  }
-
   // Check gate lazily when hook runs (cached, non-blocking)
   if (!isSessionMemoryGateEnabled()) {
     // Log gate failure once per session (ant-only)
