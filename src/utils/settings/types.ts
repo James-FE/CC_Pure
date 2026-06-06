@@ -1074,6 +1074,21 @@ export const SettingsSchema = lazySchema(() =>
             'Only applies to User, Project, and Local memory types (Managed/policy files cannot be excluded). ' +
             'Examples: "/home/user/monorepo/CLAUDE.md", "**/code/CLAUDE.md", "**/some-dir/.claude/rules/**"',
         ),
+      cacheThreshold: z
+        .number()
+        .int()
+        .min(0)
+        .max(100)
+        .optional()
+        .describe(
+          'Prompt cache hit rate threshold (0-100). Warnings shown when cache hit rate falls below this percentage. Default: 80.',
+        ),
+      cacheWarningEnabled: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to show cache hit rate warnings in the message flow when the rate falls below cacheThreshold. Default: true.',
+        ),
       pluginTrustMessage: z
         .string()
         .optional()
