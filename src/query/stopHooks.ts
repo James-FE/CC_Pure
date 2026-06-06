@@ -82,8 +82,6 @@ export async function* handleStopHooks(
   StopHookResult
 > {
   const hookStartTime = Date.now()
-  // CCP: poor mode module not present — always false
-  const poorMode = false
 
   const stopHookContext: REPLHookContext = {
     messages: [...messagesForQuery, ...assistantMessages],
@@ -157,7 +155,7 @@ export async function* handleStopHooks(
           | undefined,
       )
     }
-    if (!toolUseContext.agentId && !poorMode) {
+    if (!toolUseContext.agentId) {
       void executeAutoDream(stopHookContext, toolUseContext.appendSystemMessage)
     }
   }

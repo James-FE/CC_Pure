@@ -248,12 +248,6 @@ Feature flags control which functionality is enabled at runtime. 代码中统一
 
 详见各兼容层的 docs 文档。
 
-### 穷鬼模式（Budget Mode）
-
-- 通过 `/poor` 命令切换，持久化到 `settings.json`。
-- 启用后跳过 `extract_memories`、`prompt_suggestion` 和 `verification_agent`，显著减少 token 消耗。
-- 实现在 `src/commands/poor/poorMode.ts`。
-
 ### Stubbed/Deleted Modules
 
 | Module | Status |
