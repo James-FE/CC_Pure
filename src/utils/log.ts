@@ -20,7 +20,6 @@ import { isEnvTruthy } from './envUtils.js'
 import { toError, shortErrorStack } from './errors.js'
 import { isEssentialTrafficOnly } from './privacyLevel.js'
 import { jsonParse } from './slowOperations.js'
-import { redactForLog } from './sensitive.js'
 
 /**
  * Gets the display title for a log/session with fallback logic.
@@ -159,11 +158,7 @@ const isHardFailMode = memoize((): boolean => {
 export function logError(error: unknown): void {
   const err = toError(error)
   if (feature('HARD_FAIL') && isHardFailMode()) {
-    // biome-ignore lint/suspicious/noConsole:: intentional crash output
-    console.error(
-      '[HARD FAIL] logError called with:',
-      redactForLog(err.stack || err.message),
-    )
+    console.error('[HARD FAIL] logError called with:', err.stack || err.message)
     // eslint-disable-next-line custom-rules/no-process-exit
     process.exit(1)
   }
@@ -235,7 +230,7 @@ export async function getErrorLogByIndex(
 async function loadLogList(path: string): Promise<LogOption[]> {
   let files: Awaited<ReturnType<typeof readdir>>
   try {
-    files = await readdir(path, { withFileTypes: true }) as any
+    files = (await readdir(path, { withFileTypes: true })) as any
   } catch {
     logError(new Error(`No logs found at ${path}`))
     return []

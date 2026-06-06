@@ -109,15 +109,13 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
       schedule?: (fn: () => Promise<void>, delayMs: number) => () => void
     } = {},
   ) {
-    // Default: prod, except when ANTHROPIC_BASE_URL is explicitly staging.
-    // Overridable via tengu_1p_event_batch_config.baseUrl.
-    const baseUrl =
-      options.baseUrl ||
-      (process.env.ANTHROPIC_BASE_URL === 'https://api-staging.anthropic.com'
-        ? 'https://api-staging.anthropic.com'
-        : 'https://api.anthropic.com')
+    // CCP has no default remote endpoint. A caller must explicitly provide a
+    // baseUrl to export 1P events off-machine.
+    const baseUrl = options.baseUrl
 
-    this.endpoint = `${baseUrl}${options.path || '/api/event_logging/batch'}`
+    this.endpoint = baseUrl
+      ? `${baseUrl}${options.path || '/api/event_logging/batch'}`
+      : ''
 
     this.timeout = options.timeout || 10000
     this.maxBatchSize = options.maxBatchSize || 200
@@ -135,7 +133,9 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
       })
 
     // Retry any failed events from previous runs of this session (in background)
-    void this.retryPreviousBatches()
+    if (this.endpoint) {
+      void this.retryPreviousBatches()
+    }
   }
 
   // Expose for testing
@@ -307,6 +307,11 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
     logs: ReadableLogRecord[],
     resultCallback: (result: ExportResult) => void,
   ): Promise<void> {
+    if (!this.endpoint) {
+      resultCallback({ code: ExportResultCode.SUCCESS })
+      return
+    }
+
     try {
       // Filter for event logs only (by scope name)
       const eventLogs = logs.filter(
@@ -673,7 +678,9 @@ export class FirstPartyEventLoggingExporter implements LogRecordExporter {
         (attributes.event_name as string) || (log.body as string) || 'unknown'
 
       // Extract metadata objects directly (no JSON parsing needed)
-      const coreMetadata = attributes.core_metadata as unknown as EventMetadata | undefined
+      const coreMetadata = attributes.core_metadata as unknown as
+        | EventMetadata
+        | undefined
       const userMetadata = attributes.user_metadata as CoreUserData
       const eventMetadata = (attributes.event_metadata || {}) as Record<
         string,
