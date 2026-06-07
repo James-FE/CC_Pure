@@ -368,7 +368,8 @@ export function isQueuedCommandEditable(cmd: QueuedCommand): boolean {
 export function isQueuedCommandVisible(cmd: QueuedCommand): boolean {
   if (
     (feature('KAIROS') || feature('KAIROS_CHANNELS')) &&
-    (cmd as any).origin?.kind === 'channel'
+    typeof cmd.origin === 'object' &&
+    cmd.origin?.kind === 'channel'
   )
     return true
   return isQueuedCommandEditable(cmd)

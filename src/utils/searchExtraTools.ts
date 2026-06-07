@@ -24,7 +24,7 @@ import {
   isDeferredTool,
   SEARCH_EXTRA_TOOLS_TOOL_NAME,
 } from '@claude-code-best/builtin-tools/tools/SearchExtraToolsTool/prompt.js'
-import type { Message } from '../types/message.js'
+import type { Message, SystemCompactBoundaryMessage } from '../types/message.js'
 import {
   countToolDefinitionTokens,
   TOOL_TOKEN_COUNT_OVERHEAD,
@@ -504,12 +504,15 @@ export function extractDiscoveredToolNames(messages: Message[]): Set<string> {
     // check rather than isCompactBoundaryMessage — utils/messages.ts imports
     // from this file, so importing back would be circular.
     if (msg.type === 'system' && msg.subtype === 'compact_boundary') {
-      const carried = (msg as any).compactMetadata?.preCompactDiscoveredTools as
-        | string[]
-        | undefined
+      const boundary = msg as SystemCompactBoundaryMessage
+      const carried = boundary.compactMetadata.preCompactDiscoveredTools
       if (carried) {
-        for (const name of carried) discoveredTools.add(name)
-        carriedFromBoundary += carried.length
+        if (Array.isArray(carried)) {
+          for (const name of carried) {
+            if (typeof name === 'string') discoveredTools.add(name)
+          }
+          carriedFromBoundary += carried.length
+        }
       }
       continue
     }

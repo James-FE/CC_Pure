@@ -49,7 +49,7 @@ export interface ResolvePrepareCaptureResult extends ScreenshotResult {
 
 export interface ComputerExecutorCapabilities {
   screenshotFiltering: 'native' | 'none'
-  platform: 'darwin' | 'win32'
+  platform: 'darwin' | 'win32' | 'linux'
   hostBundleId: string
 }
 
