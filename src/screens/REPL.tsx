@@ -417,6 +417,8 @@ import { useLspPluginRecommendation } from 'src/hooks/useLspPluginRecommendation
 import { LspRecommendationMenu } from 'src/components/LspRecommendation/LspRecommendationMenu.js';
 import { useClaudeCodeHintRecommendation } from 'src/hooks/useClaudeCodeHintRecommendation.js';
 import { PluginHintMenu } from 'src/components/ClaudeCodeHint/PluginHintMenu.js';
+import { SearchExtraToolsHint } from 'src/components/SearchExtraToolsHint.js';
+import { useSearchExtraToolsHint } from 'src/hooks/useSearchExtraToolsHint.js';
 import {
   DesktopUpsellStartup,
   shouldShowDesktopUpsellStartup,
@@ -790,8 +792,8 @@ export function REPL({
   pendingHookMessages,
   initialFileHistorySnapshots,
   initialContentReplacements,
-  initialAgentName,
-  initialAgentColor,
+  initialAgentName: _initialAgentName,
+  initialAgentColor: _initialAgentColor,
   mcpClients: initialMcpClients,
   dynamicMcpConfig: initialDynamicMcpConfig,
   autoConnectIdeFlag,
@@ -999,6 +1001,7 @@ export function REPL({
   useTeammateLifecycleNotification();
   const { recommendation: lspRecommendation, handleResponse: handleLspResponse } = useLspPluginRecommendation();
   const { recommendation: hintRecommendation, handleResponse: handleHintResponse } = useClaudeCodeHintRecommendation();
+  const searchExtraToolsHint = useSearchExtraToolsHint();
 
   // Memoize the combined initial tools array to prevent reference changes
   const combinedInitialTools = useMemo(() => {
@@ -2357,6 +2360,7 @@ export function REPL({
     | 'remote-callout'
     | 'lsp-recommendation'
     | 'plugin-hint'
+    | 'search-extra-tools-hint'
     | 'desktop-upsell'
     | 'ultraplan-choice'
     | 'ultraplan-launch'
@@ -2410,6 +2414,9 @@ export function REPL({
 
     // Plugin hint from CLI/SDK stderr (same priority band as LSP rec)
     if (allowDialogsWithAnimation && hintRecommendation) return 'plugin-hint';
+
+    // Tool search hint (discovered tools relevant to current query)
+    if (allowDialogsWithAnimation && searchExtraToolsHint.visible) return 'search-extra-tools-hint';
 
     // Desktop app upsell (max 3 launches, lowest priority)
     if (allowDialogsWithAnimation && showDesktopUpsellStartup) return 'desktop-upsell';
@@ -2784,7 +2791,7 @@ export function REPL({
   const getToolUseContext = useCallback(
     (
       messages: MessageType[],
-      newMessages: MessageType[],
+      _newMessages: MessageType[],
       abortController: AbortController,
       mainLoopModel: string,
     ): ProcessUserInputContext => {
@@ -3155,7 +3162,7 @@ export function REPL({
   const onQueryImpl = useCallback(
     async (
       messagesIncludingNewMessages: MessageType[],
-      newMessages: MessageType[],
+      _newMessages: MessageType[],
       abortController: AbortController,
       shouldQuery: boolean,
       additionalAllowedTools: string[],
@@ -3185,7 +3192,7 @@ export function REPL({
       // processTextPrompt) — both pushed length past 1 on turn one, so the
       // title silently fell through to the "Claude Code" default.
       if (!titleDisabled && !sessionTitle && !agentTitle && !haikuTitleAttemptedRef.current) {
-        const firstUserMessage = newMessages.find(m => m.type === 'user' && !m.isMeta);
+        const firstUserMessage = _newMessages.find(m => m.type === 'user' && !m.isMeta);
         const text =
           firstUserMessage?.type === 'user'
             ? getContentText(firstUserMessage.message!.content as string | ContentBlockParam[])
@@ -3250,7 +3257,7 @@ export function REPL({
         // Manual /compact sets messages directly (shouldQuery=false) bypassing
         // handleMessageFromStream. Clear context-blocked if a compact boundary
         // is present so proactive ticks resume after compaction.
-        if (newMessages.some(isCompactBoundaryMessage)) {
+        if (_newMessages.some(isCompactBoundaryMessage)) {
           // Bump conversationId so Messages.tsx row keys change and
           // stale memoized rows remount with post-compact content.
           setConversationId(randomUUID());
@@ -3265,7 +3272,7 @@ export function REPL({
 
       const toolUseContext = getToolUseContext(
         messagesIncludingNewMessages,
-        newMessages,
+        _newMessages,
         abortController,
         mainLoopModelParam,
       );
@@ -5934,6 +5941,14 @@ export function REPL({
                     marketplaceName={hintRecommendation.marketplaceName}
                     sourceCommand={hintRecommendation.sourceCommand}
                     onResponse={handleHintResponse}
+                  />
+                )}
+
+                {focusedInputDialog === 'search-extra-tools-hint' && searchExtraToolsHint.visible && (
+                  <SearchExtraToolsHint
+                    tools={searchExtraToolsHint.tools}
+                    onSelect={searchExtraToolsHint.handleSelect}
+                    onDismiss={searchExtraToolsHint.handleDismiss}
                   />
                 )}
 

@@ -1,4 +1,5 @@
 import type { BetaToolUnion } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
+import type { ChatCompletionCreateParamsStreaming } from 'openai/resources/chat/completions/completions.mjs'
 import type { SystemPrompt } from '../../../utils/systemPromptType.js'
 import type {
   Message,
@@ -7,6 +8,7 @@ import type {
   AssistantMessage,
   UserMessage,
 } from '../../../types/message.js'
+import type { AgentId } from '../../../types/ids.js'
 import type { Tools } from '../../../Tool.js'
 import { getOpenAIClient } from './client.js'
 import { anthropicMessagesToOpenAI } from './convertMessages.js'
@@ -40,31 +42,30 @@ import {
   normalizeContentFromAPI,
 } from '../../../utils/messages.js'
 import {
-  isToolSearchEnabled,
-  extractDiscoveredToolNames,
+  isSearchExtraToolsEnabled,
   isDeferredToolsDeltaEnabled,
-} from '../../../utils/toolSearch.js'
+} from '../../../utils/searchExtraTools.js'
 import {
   formatDeferredToolLine,
   isDeferredTool,
-  TOOL_SEARCH_TOOL_NAME,
-} from '../../../tools/ToolSearchTool/prompt.js'
+  SEARCH_EXTRA_TOOLS_TOOL_NAME,
+} from '@claude-code-best/builtin-tools/tools/SearchExtraToolsTool/prompt.js'
 
 /**
  * Mirrors the Anthropic request path's deferred-tool announcement for OpenAI.
  *
  * OpenAI-compatible endpoints cannot consume Anthropic's `defer_loading` or
  * `tool_reference` beta payloads directly, so the model needs the same textual
- * list of deferred MCP tool names before it can ask ToolSearchTool to load
- * their full schemas.
+ * list of deferred MCP tool names that Anthropic receives before it can ask
+ * SearchExtraToolsTool to load their full schemas.
  */
 function prependDeferredToolListIfNeeded(
   messages: (AssistantMessage | UserMessage)[],
   tools: Tools,
   deferredToolNames: Set<string>,
-  useToolSearch: boolean,
+  useSearchExtraTools: boolean,
 ): (AssistantMessage | UserMessage)[] {
-  if (!useToolSearch || isDeferredToolsDeltaEnabled()) return messages
+  if (!useSearchExtraTools || isDeferredToolsDeltaEnabled()) return messages
 
   const deferredToolList = tools
     .filter(tool => deferredToolNames.has(tool.name))
@@ -123,7 +124,7 @@ function assembleFinalAssistantOutputs(params: {
     outputs.push({
       message: {
         ...partialMessage,
-        content: normalizeContentFromAPI(allBlocks, tools, agentId),
+        content: normalizeContentFromAPI(allBlocks, tools, agentId as AgentId),
         usage,
         stop_reason: stopReason,
         stop_sequence: null,
@@ -174,7 +175,7 @@ export async function* queryModelOpenAI(
     const messagesForAPI = normalizeMessagesForAPI(messages, tools)
 
     // 3. Check if tool search is enabled (similar to Anthropic path)
-    const useToolSearch = await isToolSearchEnabled(
+    const useSearchExtraTools = await isSearchExtraToolsEnabled(
       options.model,
       tools,
       options.getToolPermissionContext ||
@@ -185,9 +186,9 @@ export async function* queryModelOpenAI(
 
     // 4. Build deferred tools set (similar to Anthropic path)
     const deferredToolNames = new Set<string>()
-    if (useToolSearch) {
-      for (const tool of tools) {
-        if (isDeferredTool(tool)) deferredToolNames.add(tool.name)
+    if (useSearchExtraTools) {
+      for (const t of tools) {
+        if (isDeferredTool(t)) deferredToolNames.add(t.name)
       }
     }
 
@@ -196,16 +197,14 @@ export async function* queryModelOpenAI(
     // via ExecuteExtraTool which looks them up from the global tool registry
     // at runtime. Keeping the tools array stable preserves the prompt cache.
     let filteredTools = tools
-    if (useToolSearch && deferredToolNames.size > 0) {
-      const discoveredToolNames = extractDiscoveredToolNames(messages)
-
+    if (useSearchExtraTools && deferredToolNames.size > 0) {
       filteredTools = tools.filter(tool => {
         // Always include non-deferred tools
         if (!deferredToolNames.has(tool.name)) return true
-        // Always include ToolSearchTool (so it can discover more tools)
-        if (toolMatchesName(tool, TOOL_SEARCH_TOOL_NAME)) return true
-        // Only include deferred tools whose schemas have already been discovered
-        return discoveredToolNames.has(tool.name)
+        // Always include SearchExtraToolsTool (so it can discover more tools)
+        if (toolMatchesName(tool, SEARCH_EXTRA_TOOLS_TOOL_NAME)) return true
+        // All other deferred tools are excluded — use ExecuteExtraTool instead
+        return false
       })
     }
 
@@ -218,14 +217,14 @@ export async function* queryModelOpenAI(
           agents: options.agents,
           allowedAgentTypes: options.allowedAgentTypes,
           model: options.model,
-          deferLoading: useToolSearch && deferredToolNames.has(tool.name),
+          deferLoading: useSearchExtraTools && deferredToolNames.has(tool.name),
         }),
       ),
     )
     // Filter out non-standard tools (server tools like advisor)
     const standardTools = toolSchemas.filter(
       (t): t is BetaToolUnion & { type: string } => {
-        const anyT = t as Record<string, unknown>
+        const anyT = t as unknown as Record<string, unknown>
         return (
           anyT.type !== 'advisor_20260301' && anyT.type !== 'computer_20250124'
         )
@@ -241,7 +240,7 @@ export async function* queryModelOpenAI(
       openAIConvertibleMessages,
       tools,
       deferredToolNames,
-      useToolSearch,
+      useSearchExtraTools,
     )
     const openaiMessages = anthropicMessagesToOpenAI(
       messagesWithDeferredToolList,
@@ -251,13 +250,44 @@ export async function* queryModelOpenAI(
     const openaiTools = anthropicToolsToOpenAI(standardTools)
     const openaiToolChoice = anthropicToolChoiceToOpenAI(options.toolChoice)
 
+    // 9. Log tool filtering details
+    if (useSearchExtraTools) {
+      const includedDeferredTools = filteredTools.filter(t =>
+        deferredToolNames.has(t.name),
+      ).length
+      logForDebugging(
+        `[OpenAI] Tool search enabled: ${includedDeferredTools}/${deferredToolNames.size} deferred tools included, total tools=${openaiTools.length}`,
+      )
+    } else {
+      logForDebugging(
+        `[OpenAI] Tool search disabled, total tools=${openaiTools.length}`,
+      )
+    }
+
+    // 10. Compute max_tokens — required by most OpenAI-compatible endpoints.
+    //     Without this the server uses a tiny default, and when
+    //     thinking is enabled the thinking phase consumes the entire budget
+    //     leaving no tokens for the final response.
+    //
+    //     Use upperLimit (not the slot-cap default) because the Anthropic path's
+    //     slot-reservation cap (CAPPED_DEFAULT_MAX_TOKENS=8k) is paired with an
+    //     auto-retry at 64k in query.ts. The OpenAI path has no such retry, so
+    //     using the capped 8k default would silently truncate responses in
+    //     multi-turn conversations where thinking consumes most of the budget.
+    //
+    //     Override priority:
+    //     1. options.maxOutputTokensOverride (programmatic)
+    //     2. OPENAI_MAX_TOKENS env var (OpenAI-specific, useful for local models
+    //        with small context windows, e.g. RTX 3060 12GB running 65536-token models)
+    //     3. CLAUDE_CODE_MAX_OUTPUT_TOKENS env var (generic override)
+    //     4. upperLimit default (64000)
     const { upperLimit } = getModelMaxOutputTokens(openaiModel)
     const maxTokens = options.maxOutputTokensOverride ?? upperLimit
 
     // 8. Get client and make streaming request
     const client = getOpenAIClient({
       maxRetries: 0,
-      fetchOverride: options.fetchOverride,
+      fetchOverride: options.fetchOverride as unknown as typeof fetch | undefined,
       source: options.querySource,
     })
 
@@ -275,7 +305,7 @@ export async function* queryModelOpenAI(
       maxTokens,
       temperatureOverride: options.temperatureOverride,
     })
-    const stream = await client.chat.completions.create(requestBody, {
+    const stream = await (client.chat.completions.create as any)(requestBody, {
       signal,
     })
 
@@ -422,7 +452,7 @@ export async function* queryModelOpenAI(
     yield createAssistantAPIErrorMessage({
       content: `API Error: ${errorMessage}`,
       apiError: 'api_error',
-      error: error instanceof Error ? error : new Error(String(error)),
+      error: (error instanceof Error ? error : new Error(String(error))) as any,
     })
   }
 }

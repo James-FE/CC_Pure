@@ -78,7 +78,7 @@ export function modelSupportsMaxEffort(_model: string): boolean {
 }
 
 export function modelSupportsXhighEffort(_model: string): boolean {
-  const supported3P = get3PModelCapabilityOverride(_model, 'xhigh_effort')
+  const supported3P = get3PModelCapabilityOverride(_model, 'xhigh_effort' as any)
   if (supported3P !== undefined) {
     return supported3P
   }
@@ -262,9 +262,9 @@ export function getEffortLevelDescription(level: EffortLevel): string {
     case 'high':
       return 'Comprehensive implementation with extensive testing and documentation'
     case 'xhigh':
-      return 'Extended reasoning beyond high, short of max (Opus 4.7 only)'
+      return 'Extended reasoning beyond high, short of max'
     case 'max':
-      return 'Maximum capability with deepest reasoning (Opus 4.6/4.7/DeepSeek V4 Pro)'
+      return 'Maximum capability with deepest reasoning'
   }
 }
 

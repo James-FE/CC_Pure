@@ -1,3 +1,6 @@
-// Auto-generated stub — replace with real implementation
-const _default: Record<string, unknown> = {};
-export default _default;
+// STUB: 待补全 — 见 docs/devlog/02-tsc-stubs.md
+// Fork command module — handles fork-related CLI subcommands.
+// Imported dynamically by src/commands.ts. Stub: empty default export.
+
+const _default: Record<string, unknown> = {}
+export default _default

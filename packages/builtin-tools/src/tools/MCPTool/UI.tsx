@@ -16,6 +16,17 @@ import { getContentSizeEstimate, type MCPToolResult } from 'src/utils/mcpValidat
 import { jsonParse, jsonStringify } from 'src/utils/slowOperations.js';
 import type { inputSchema } from './MCPTool.js';
 
+/**
+ * Local type describing the actual runtime shape of MCP progress data.
+ * MCPProgress is `Record<string, unknown>`, so we need a concrete shape
+ * for property access without resorting to `as any`.
+ */
+type MCPProgressData = {
+  progress?: number;
+  total?: number;
+  progressMessage?: string;
+};
+
 // Threshold for displaying warning about large MCP responses
 const MCP_OUTPUT_WARNING_THRESHOLD_TOKENS = 10_000;
 
@@ -69,7 +80,7 @@ export function renderToolUseProgressMessage(
     );
   }
 
-  const { progress, total, progressMessage } = lastProgress.data;
+  const { progress, total, progressMessage } = lastProgress.data as MCPProgressData;
 
   if (progress === undefined) {
     return (

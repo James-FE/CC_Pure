@@ -40,7 +40,6 @@ import {
   isTeammate,
 } from '../../utils/teammate.js'
 import { feature } from 'bun:bundle'
-import { COMPUTER_USE_MCP_SERVER_NAME } from '../../utils/computerUse/common.js'
 
 /**
  * Marker type for verifying analytics metadata doesn't contain sensitive data
@@ -126,9 +125,17 @@ export function isAnalyticsToolDetailsLoggingEnabled(
  * reservation (main.tsx, config.ts addMcpServer) is itself feature-gated, so
  * a user-configured 'computer-use' is possible in builds without the feature.
  */
+/* eslint-disable @typescript-eslint/no-require-imports */
 const BUILTIN_MCP_SERVER_NAMES: ReadonlySet<string> = new Set(
-  feature('CHICAGO_MCP') ? [COMPUTER_USE_MCP_SERVER_NAME] : [],
+  feature('CHICAGO_MCP')
+    ? [
+        (
+          require('../../utils/computerUse/common.js') as typeof import('../../utils/computerUse/common.js')
+        ).COMPUTER_USE_MCP_SERVER_NAME,
+      ]
+    : [],
 )
+/* eslint-enable @typescript-eslint/no-require-imports */
 
 /**
  * Spreadable helper for logEvent payloads — returns {mcpServerName, mcpToolName}
@@ -734,7 +741,6 @@ export async function getEventMetadata(
 
   return metadata
 }
-
 
 /**
  * Core event metadata for 1P event logging (snake_case format).

@@ -17,7 +17,7 @@ type Props = {
 }
 
 export function FileEditToolUpdatedMessage({
-  filePath,
+  filePath: _filePath,
   structuredPatch,
   firstLine,
   fileContent,
@@ -76,7 +76,7 @@ export function FileEditToolUpdatedMessage({
           hunks={structuredPatch}
           dim={false}
           width={columns - 12}
-          filePath={filePath}
+          filePath={_filePath}
           firstLine={firstLine}
           fileContent={fileContent}
         />

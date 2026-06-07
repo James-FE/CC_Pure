@@ -1,4 +1,5 @@
 // biome-ignore-all assist/source/organizeImports: ANT-ONLY import markers must not be reordered
+import type { ToolDiscoveryResult } from '../services/searchExtraTools/prefetch.js'
 import {
   logEvent,
   type AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
@@ -18,7 +19,7 @@ import {
 import { FileTooLargeError, readFileInRange } from './readFileInRange.js'
 import { expandPath } from './path.js'
 import { countCharInString } from './stringUtils.js'
-import { count, uniq } from './array.js'
+import { uniq } from './array.js'
 import { getFsImplementation } from './fsOperations.js'
 import { readdir, stat } from 'fs/promises'
 import type { IDESelection } from '../hooks/useIdeSelection.js'
@@ -36,10 +37,9 @@ import {
 } from './tasks.js'
 import { getPlanFilePath, getPlan } from './plans.js'
 import { getConnectedIdeName } from './ide.js'
+import { getSettings_DEPRECATED } from './settings/settings.js'
 import {
-  filterInjectedMemoryFiles,
   getManagedAndUserConditionalRules,
-  getMemoryFiles,
   getMemoryFilesForNestedDirectory,
   getConditionalRulesForCwdLevelDirectory,
   type MemoryFileInfo,
@@ -63,7 +63,6 @@ import {
   isValidImagePaste,
 } from 'src/types/textInputTypes.js'
 import { randomUUID, type UUID } from 'crypto'
-import { getSettings_DEPRECATED } from './settings/settings.js'
 import { getSnippetForTwoFileDiff } from '@claude-code-best/builtin-tools/tools/FileEditTool/utils.js'
 import type {
   ContentBlockParam,
@@ -72,7 +71,6 @@ import type {
 } from '@anthropic-ai/sdk/resources/messages.mjs'
 import { maybeResizeAndDownsampleImageBlock } from './imageResizer.js'
 import type { PastedContent } from './config.js'
-import { getGlobalConfig } from './config.js'
 import {
   getDefaultSonnetModel,
   getDefaultHaikuModel,
@@ -98,8 +96,16 @@ import * as autoModeStateModuleValue from './permissions/autoModeState.js'
 /* eslint-disable @typescript-eslint/no-require-imports */
 const skillSearchModules = feature('EXPERIMENTAL_SKILL_SEARCH')
   ? {
-      featureCheck: skillSearchFeatureCheck,
-      prefetch: skillSearchPrefetch,
+      featureCheck:
+        require('../services/skillSearch/featureCheck.js') as typeof import('../services/skillSearch/featureCheck.js'),
+      prefetch:
+        require('../services/skillSearch/prefetch.js') as typeof import('../services/skillSearch/prefetch.js'),
+    }
+  : null
+const searchExtraToolsModules = feature('EXPERIMENTAL_SEARCH_EXTRA_TOOLS')
+  ? {
+      prefetch:
+        require('../services/searchExtraTools/prefetch.js') as typeof import('../services/searchExtraTools/prefetch.js'),
     }
   : null
 const autoModeStateModule = feature('TRANSCRIPT_CLASSIFIER')
@@ -164,18 +170,17 @@ import type { QuerySource } from '../constants/querySource.js'
 import {
   getDeferredToolsDelta,
   isDeferredToolsDeltaEnabled,
-  isToolSearchEnabledOptimistic,
-  isToolSearchToolAvailable,
-  modelSupportsToolReference,
+  isSearchExtraToolsEnabledOptimistic,
+  isSearchExtraToolsToolAvailable,
   type DeferredToolsDeltaScanContext,
-} from './toolSearch.js'
+} from './searchExtraTools.js'
 import {
   getMcpInstructionsDelta,
   isMcpInstructionsDeltaEnabled,
   type ClientSideInstruction,
 } from './mcpInstructionsDelta.js'
 import { CLAUDE_IN_CHROME_MCP_SERVER_NAME } from './claudeInChrome/common.js'
-import { CHROME_TOOL_SEARCH_INSTRUCTIONS } from './claudeInChrome/prompt.js'
+import { CHROME_SEARCH_EXTRA_TOOLS_INSTRUCTIONS } from './claudeInChrome/prompt.js'
 import type { MCPServerConnection } from '../services/mcp/types.js'
 import type {
   HookEvent,
@@ -201,9 +206,7 @@ import { feature } from 'bun:bundle'
 import * as sessionTranscriptModuleValue from '../services/sessionTranscript/sessionTranscript.js'
 /* eslint-disable @typescript-eslint/no-require-imports */
 const BRIEF_TOOL_NAME: string | null =
-  feature('KAIROS') || feature('KAIROS_BRIEF')
-    ? BRIEF_TOOL_NAME_VALUE
-    : null
+  feature('KAIROS') || feature('KAIROS_BRIEF') ? BRIEF_TOOL_NAME_VALUE : null
 const sessionTranscriptModule = feature('KAIROS')
   ? sessionTranscriptModuleValue
   : null
@@ -769,6 +772,7 @@ export async function getAttachments(
   const context = { ...toolUseContext, abortController }
 
   const isMainThread = !toolUseContext.agentId
+  let suppressNextDiscovery = false
 
   // Attachments which are added in response to on user input
   const userInputAttachments = input
@@ -804,11 +808,35 @@ export async function getAttachments(
         !options?.skipSkillDiscovery
           ? [
               maybe('skill_discovery', async () => {
-                const result = await skillSearchModules.prefetch.getTurnZeroSkillDiscovery(
-                  input,
-                  messages ?? [],
-                  context,
-                )
+                if (suppressNextDiscovery) {
+                  suppressNextDiscovery = false
+                  return []
+                }
+                const result =
+                  await skillSearchModules.prefetch.getTurnZeroSkillDiscovery(
+                    input,
+                    messages ?? [],
+                    context,
+                  )
+                return result ? [result] : []
+              }),
+            ]
+          : []),
+        // Tool discovery on turn 0. Inter-turn discovery runs via
+        // startSearchExtraToolsPrefetch in query.ts.
+        ...(feature('EXPERIMENTAL_SEARCH_EXTRA_TOOLS') &&
+        searchExtraToolsModules &&
+        !options?.skipSkillDiscovery
+          ? [
+              maybe('tool_discovery', async () => {
+                if (suppressNextDiscovery) {
+                  return []
+                }
+                const result =
+                  await searchExtraToolsModules.prefetch.getTurnZeroSearchExtraToolsPrefetch(
+                    input,
+                    context.options.tools ?? [],
+                  )
                 return result ? [result] : []
               }),
             ]
@@ -997,11 +1025,13 @@ export async function getAttachments(
 
   clearTimeout(timeoutId)
   // Defensive: a getter leaking [undefined] crashes .map(a => a.type) below.
-  return ([
-    ...userAttachmentResults.flat(),
-    ...threadAttachmentResults.flat(),
-    ...mainThreadAttachmentResults.flat(),
-  ] as Attachment[]).filter(a => a !== undefined && a !== null)
+  return (
+    [
+      ...userAttachmentResults.flat(),
+      ...threadAttachmentResults.flat(),
+      ...mainThreadAttachmentResults.flat(),
+    ] as Attachment[]
+  ).filter(a => a !== undefined && a !== null)
 }
 
 async function maybe<A>(label: string, f: () => Promise<A[]>): Promise<A[]> {
@@ -1461,16 +1491,15 @@ export function getDeferredToolsDeltaAttachment(
   scanContext?: DeferredToolsDeltaScanContext,
 ): Attachment[] {
   if (!isDeferredToolsDeltaEnabled()) return []
-  // These three checks mirror the sync parts of isToolSearchEnabled —
-  // the attachment text says "available via ToolSearch", so ToolSearch
+  // These three checks mirror the sync parts of isSearchExtraToolsEnabled —
+  // the attachment text says "available via SearchExtraTools", so SearchExtraTools
   // has to actually be in the request. The async auto-threshold check
-  // is not replicated (would double-fire tengu_tool_search_mode_decision);
-  // in tst-auto below-threshold the attachment can fire while ToolSearch
+  // is not replicated (would double-fire tengu_search_extra_tools_mode_decision);
+  // in tst-auto below-threshold the attachment can fire while SearchExtraTools
   // is filtered out, but that's a narrow case and the tools announced
   // are directly callable anyway.
-  if (!isToolSearchEnabledOptimistic()) return []
-  if (!modelSupportsToolReference(model)) return []
-  if (!isToolSearchToolAvailable(tools)) return []
+  if (!isSearchExtraToolsEnabledOptimistic()) return []
+  if (!isSearchExtraToolsToolAvailable(tools)) return []
   const delta = getDeferredToolsDelta(tools, messages ?? [], scanContext)
   if (!delta) return []
   return [{ type: 'deferred_tools_delta', ...delta }]
@@ -1528,7 +1557,8 @@ export function getAgentListingDeltaAttachment(
     if (msg.type !== 'attachment') continue
     if (msg.attachment!.type !== 'agent_listing_delta') continue
     for (const t of msg.attachment!.addedTypes as string[]) announced.add(t)
-    for (const t of msg.attachment!.removedTypes as string[]) announced.delete(t)
+    for (const t of msg.attachment!.removedTypes as string[])
+      announced.delete(t)
   }
 
   const currentTypes = new Set(filtered.map(a => a.agentType))
@@ -1566,18 +1596,17 @@ export function getMcpInstructionsDeltaAttachment(
 ): Attachment[] {
   if (!isMcpInstructionsDeltaEnabled()) return []
 
-  // The chrome ToolSearch hint is client-authored and ToolSearch-conditional;
+  // The chrome SearchExtraTools hint is client-authored and SearchExtraTools-conditional;
   // actual server `instructions` are unconditional. Decide the chrome part
   // here, pass it into the pure diff as a synthesized entry.
   const clientSide: ClientSideInstruction[] = []
   if (
-    isToolSearchEnabledOptimistic() &&
-    modelSupportsToolReference(model) &&
-    isToolSearchToolAvailable(tools)
+    isSearchExtraToolsEnabledOptimistic() &&
+    isSearchExtraToolsToolAvailable(tools)
   ) {
     clientSide.push({
       serverName: CLAUDE_IN_CHROME_MCP_SERVER_NAME,
-      block: CHROME_TOOL_SEARCH_INSTRUCTIONS,
+      block: CHROME_SEARCH_EXTRA_TOOLS_INSTRUCTIONS,
     })
   }
 
@@ -1750,7 +1779,6 @@ export function memoryFilesToAttachments(
         limit: undefined,
         isPartialView: memoryFile.contentDiffersFromDisk,
       })
-
 
       // Fire InstructionsLoaded hook for audit/observability (fire-and-forget)
       if (shouldFireHook && isInstructionsMemoryType(memoryFile.type)) {
@@ -2260,7 +2288,11 @@ export function collectSurfacedMemories(messages: ReadonlyArray<Message>): {
   let totalBytes = 0
   for (const m of messages) {
     if (m.type === 'attachment' && m.attachment!.type === 'relevant_memories') {
-      for (const mem of m.attachment!.memories as { path: string; content: string; mtimeMs: number }[]) {
+      for (const mem of m.attachment!.memories as {
+        path: string
+        content: string
+        mtimeMs: number
+      }[]) {
         paths.add(mem.path)
         totalBytes += mem.content.length
       }
@@ -2478,7 +2510,11 @@ export function collectRecentSuccessfulTools(
     if (!m) continue
     if (isHumanTurn(m) && m !== lastUserMessage) break
     if (m.type === 'assistant' && typeof m.message!.content !== 'string') {
-      for (const block of m.message!.content as Array<{type: string; id: string; name: string}>) {
+      for (const block of m.message!.content as Array<{
+        type: string
+        id: string
+        name: string
+      }>) {
         if (block.type === 'tool_use') useIdToName.set(block.id, block.name)
       }
     } else if (
@@ -2486,7 +2522,7 @@ export function collectRecentSuccessfulTools(
       'message' in m &&
       Array.isArray(m.message!.content)
     ) {
-      for (const block of m.message!.content as Array<{type: string}>) {
+      for (const block of m.message!.content as Array<{ type: string }>) {
         if (isToolResultBlock(block)) {
           resultByUseId.set(block.tool_use_id, block.is_error === true)
         }
@@ -2506,7 +2542,6 @@ export function collectRecentSuccessfulTools(
   }
   return [...succeeded].filter(t => !failed.has(t))
 }
-
 
 /**
  * Filters prefetched memory attachments to exclude memories the model already
@@ -3484,7 +3519,7 @@ async function getAsyncHookResponseAttachments(): Promise<Attachment[]> {
       hookName,
       hookEvent,
       toolName,
-      pluginId,
+      pluginId: _pluginId,
       stdout,
       stderr,
       exitCode,
@@ -3986,7 +4021,6 @@ export function getContextEfficiencyAttachment(
 
   return [{ type: 'context_efficiency' }]
 }
-
 
 function isFileReadDenied(
   filePath: string,

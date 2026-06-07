@@ -17,7 +17,6 @@ import { getPlatform, getWslVersion } from '../../utils/platform.js'
 import { jsonStringify } from '../../utils/slowOperations.js'
 import { profileCheckpoint } from '../../utils/startupProfiler.js'
 import { getCoreUserData } from '../../utils/user.js'
-import { isAnalyticsDisabled } from './config.js'
 import { FirstPartyEventLoggingExporter } from './firstPartyEventLoggingExporter.js'
 import type { GrowthBookUserAttributes } from './growthbook.js'
 import { getDynamicConfig_CACHED_MAY_BE_STALE } from './growthbook.js'
@@ -139,8 +138,10 @@ export async function shutdown1PEventLogging(): Promise<void> {
  * metrics opt-out via API. It follows the same pattern as Statsig event logging.
  */
 export function is1PEventLoggingEnabled(): boolean {
-  // Respect standard analytics opt-outs
-  return !isAnalyticsDisabled()
+  // CCP keeps analytics local by default. The restored upstream 1P pipeline
+  // remains available in the source tree, but is not allowed to send telemetry
+  // to Anthropic from this fork.
+  return false
 }
 
 /**
@@ -331,6 +332,7 @@ export function initialize1PEventLogging(): void {
     parseInt(
       process.env.OTEL_LOGS_EXPORT_INTERVAL ||
         DEFAULT_LOGS_EXPORT_INTERVAL_MS.toString(),
+      10,
     )
 
   const maxExportBatchSize =

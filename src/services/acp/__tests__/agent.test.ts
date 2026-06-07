@@ -30,9 +30,13 @@ mock.module('src/utils/config.ts', () => ({
   enableConfigs: mock(() => {}),
 }))
 
+const mockSwitchSession = mock(() => {})
+
 mock.module('../../../bootstrap/state.js', () => ({
   setOriginalCwd: mock(() => {}),
   addSlowOperation: mock(() => {}),
+  switchSession: mockSwitchSession,
+  getSessionProjectDir: mock(() => null),
 }))
 
 const mockGetDefaultAppState = mock(() => ({
@@ -80,6 +84,15 @@ mock.module('../utils.js', () => ({
 
 mock.module('../../../utils/listSessionsImpl.js', () => ({
   listSessionsImpl: mock(async () => []),
+}))
+
+const mockResolveSessionFilePath = mock(async () => ({
+  filePath: '/fake/project/dir/session.jsonl',
+  projectPath: '/tmp',
+  fileSize: 100,
+}))
+mock.module('../../../utils/sessionStoragePortable.js', () => ({
+  resolveSessionFilePath: mockResolveSessionFilePath,
 }))
 
 const mockGetMainLoopModel = mock(() => 'claude-sonnet-4-6')
@@ -744,6 +757,78 @@ describe('AcpAgent', () => {
         (c: any) => c.name === 'commit',
       )
       expect(commit.input).toEqual({ hint: '[message]' })
+    })
+  })
+
+  describe('sessionId alignment with global state', () => {
+    test('newSession calls switchSession with the generated sessionId', async () => {
+      const agent = new AcpAgent(makeConn())
+      const res = await agent.newSession({ cwd: '/tmp' } as any)
+      expect(mockSwitchSession).toHaveBeenCalledWith(res.sessionId, null)
+    })
+
+    test('resumeSession calls switchSession with the requested sessionId', async () => {
+      const agent = new AcpAgent(makeConn())
+      const requestedId = 'resume-test-session-id'
+      await agent.unstable_resumeSession({
+        sessionId: requestedId,
+        cwd: '/tmp',
+        mcpServers: [],
+      } as any)
+
+      expect(mockSwitchSession).toHaveBeenCalledWith(
+        requestedId,
+        expect.any(String),
+      )
+    })
+
+    test('loadSession calls switchSession with the requested sessionId', async () => {
+      const agent = new AcpAgent(makeConn())
+      const requestedId = 'load-test-session-id'
+      await agent.loadSession({
+        sessionId: requestedId,
+        cwd: '/tmp',
+        mcpServers: [],
+      } as any)
+
+      expect(mockSwitchSession).toHaveBeenCalledWith(
+        requestedId,
+        expect.any(String),
+      )
+    })
+
+    test('resumeSession with existing session still calls switchSession', async () => {
+      const agent = new AcpAgent(makeConn())
+      const { sessionId } = await agent.newSession({ cwd: '/tmp' } as any)
+      mockSwitchSession.mockClear()
+
+      // Resume the same session — should still align global state
+      await agent.unstable_resumeSession({
+        sessionId,
+        cwd: '/tmp',
+        mcpServers: [],
+      } as any)
+
+      expect(mockSwitchSession).toHaveBeenCalledWith(
+        sessionId,
+        expect.any(String),
+      )
+    })
+
+    test('prompt switches global sessionId to the correct session', async () => {
+      const agent = new AcpAgent(makeConn())
+      await agent.newSession({ cwd: '/tmp' } as any)
+      await agent.newSession({ cwd: '/tmp' } as any)
+      mockSwitchSession.mockClear()
+
+      // Prompts must switch global state so recordTranscript writes to
+      // the correct session file in multi-session scenarios.
+      const s1 = agent.sessions.keys().next().value
+      await agent.prompt({
+        sessionId: s1,
+        prompt: [{ type: 'text', text: 'hello' }],
+      } as any)
+      expect(mockSwitchSession).toHaveBeenCalledWith(s1, null)
     })
   })
 })

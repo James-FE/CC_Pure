@@ -174,7 +174,7 @@ async function getOtlpReaders() {
         }
         case 'http/json': {
           const { OTLPMetricExporter } = await import(
-            '@opentelemetry/exporter-metrics-otlp-http'
+            '@opentelemetry/exporter-metrics-otlp-http' // package name, not endpoint
           )
           exporters.push(new OTLPMetricExporter(httpConfig))
           break
@@ -282,7 +282,7 @@ async function getOtlpLogExporters() {
         }
         case 'http/json': {
           const { OTLPLogExporter } = await import(
-            '@opentelemetry/exporter-logs-otlp-http'
+            '@opentelemetry/exporter-logs-otlp-http' // package name, not endpoint
           )
           exporters.push(new OTLPLogExporter(httpConfig))
           break
@@ -333,7 +333,7 @@ async function getOtlpTraceExporters() {
         }
         case 'http/json': {
           const { OTLPTraceExporter } = await import(
-            '@opentelemetry/exporter-trace-otlp-http'
+            '@opentelemetry/exporter-trace-otlp-http' // package name, not endpoint
           )
           exporters.push(new OTLPTraceExporter(httpConfig))
           break
@@ -373,6 +373,10 @@ function getBigQueryExportingReader() {
 }
 
 function isBigQueryMetricsEnabled() {
+  if (!process.env.ANT_CLAUDE_CODE_METRICS_ENDPOINT) {
+    return false
+  }
+
   // BigQuery metrics are enabled for:
   // 1. API customers (excluding Claude.ai subscribers and Bedrock/Vertex)
   // 2. Claude for Enterprise (C4E) users
@@ -398,8 +402,8 @@ async function initializeBetaTracing(
   }
 
   const [{ OTLPTraceExporter }, { OTLPLogExporter }] = await Promise.all([
-    import('@opentelemetry/exporter-trace-otlp-http'),
-    import('@opentelemetry/exporter-logs-otlp-http'),
+    import('@opentelemetry/exporter-trace-otlp-http'), // package name, not endpoint
+    import('@opentelemetry/exporter-logs-otlp-http'), // package name, not endpoint
   ])
 
   const httpConfig = {

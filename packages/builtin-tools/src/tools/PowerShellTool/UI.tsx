@@ -13,6 +13,21 @@ import type { PowerShellProgress } from 'src/types/tools.js';
 import type { ThemeName } from 'src/utils/theme.js';
 import type { Out, PowerShellToolInput } from './PowerShellTool.js';
 
+/**
+ * Local type describing the actual runtime shape of PowerShell progress data.
+ * PowerShellProgress is `Record<string, unknown>`, so we need a concrete shape
+ * for property access without resorting to `as any`.
+ */
+type PowerShellProgressData = {
+  fullOutput?: string;
+  output?: string;
+  elapsedTimeSeconds?: number;
+  totalLines?: number;
+  totalBytes?: number;
+  timeoutMs?: number;
+  taskId?: string;
+};
+
 // Constants for command display
 const MAX_COMMAND_DISPLAY_LINES = 2;
 const MAX_COMMAND_DISPLAY_CHARS = 160;
@@ -75,7 +90,7 @@ export function renderToolUseProgressMessage(
     );
   }
 
-  const data = lastProgress.data;
+  const data = lastProgress.data as PowerShellProgressData;
 
   return (
     <ShellProgressMessage
@@ -115,7 +130,7 @@ export function renderToolResultMessage(
   },
 ): React.ReactNode {
   const lastProgress = progressMessagesForMessage.at(-1);
-  const timeoutMs = lastProgress?.data?.timeoutMs;
+  const timeoutMs = (lastProgress?.data as PowerShellProgressData | undefined)?.timeoutMs;
   const { stdout, stderr, interrupted, returnCodeInterpretation, isImage, backgroundTaskId } = content;
 
   if (isImage) {

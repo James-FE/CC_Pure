@@ -171,8 +171,8 @@ function getTeammateMailbox(): typeof import('./teammateMailbox.js') {
 
 import {
   isToolReferenceBlock,
-  isToolSearchEnabledOptimistic,
-} from './toolSearch.js'
+  isSearchExtraToolsEnabledOptimistic,
+} from './searchExtraTools.js'
 
 const MEMORY_CORRECTION_HINT =
   "\n\nNote: The user's next message may contain a correction or preference. Pay close attention — if they explain what went wrong or how they'd prefer you to work, consider saving that to memory for future sessions."
@@ -2058,7 +2058,7 @@ export function stripCallerFieldFromAssistantMessage(
 
 /**
  * Does the content array have a tool_result block whose inner content
- * contains tool_reference (ToolSearch loaded tools)?
+ * contains tool_reference (SearchExtraTools loaded tools)?
  */
 function contentHasToolReference(
   content: ReadonlyArray<ContentBlockParam>,
@@ -2387,7 +2387,7 @@ export function normalizeMessagesForAPI(
           // When tool search IS enabled, strip only tool_reference blocks for
           // tools that no longer exist (e.g., MCP server was disconnected).
           let normalizedMessage = message
-          if (!isToolSearchEnabledOptimistic()) {
+          if (!isSearchExtraToolsEnabledOptimistic()) {
             normalizedMessage = stripToolReferenceBlocksFromUserMessage(message)
           } else {
             normalizedMessage = stripUnavailableToolReferencesFromUserMessage(
@@ -2489,7 +2489,7 @@ export function normalizeMessagesForAPI(
           // When tool search is NOT enabled, we must strip tool_search-specific fields
           // like 'caller' from tool_use blocks, as these are only valid with the
           // tool search beta header
-          const toolSearchEnabled = isToolSearchEnabledOptimistic()
+          const searchExtraToolsEnabled = isSearchExtraToolsEnabledOptimistic()
           const normalizedMessage: AssistantMessage = {
             ...message,
             message: {
@@ -2513,7 +2513,7 @@ export function normalizeMessagesForAPI(
                   const canonicalName = tool?.name ?? toolUseBlk.name
 
                   // When tool search is enabled, preserve all fields including 'caller'
-                  if (toolSearchEnabled) {
+                  if (searchExtraToolsEnabled) {
                     return {
                       ...block,
                       name: canonicalName,
@@ -2541,21 +2541,26 @@ export function normalizeMessagesForAPI(
           }
 
           // Find a previous assistant message with the same message ID and merge.
-          // Walk backwards, skipping tool results and different-ID assistants,
-          // since concurrent agents (teammates) can interleave streaming content
-          // blocks from multiple API responses with different message IDs.
+          // Walk backwards, skipping different-ID assistants, since concurrent
+          // agents (teammates) can interleave streaming content blocks from
+          // multiple API responses with different message IDs.
+          //
+          // Do NOT skip tool_result messages — when claude.ts yields separate
+          // AssistantMessages for thinking and tool_use blocks (same message.id),
+          // a StreamingToolExecutor tool_result can land between them. Merging
+          // across that boundary produces duplicate tool_use IDs that downstream
+          // ensureToolResultPairing strips, leaving orphaned tool_results and
+          // ultimately consecutive user messages → API 400 (CC-1215).
           for (let i = result.length - 1; i >= 0; i--) {
             const msg = result[i]!
 
-            if (msg.type !== 'assistant' && !isToolResultMessage(msg)) {
+            if (msg.type !== 'assistant') {
               break
             }
 
-            if (msg.type === 'assistant') {
-              if (msg.message.id === normalizedMessage.message.id) {
-                result[i] = mergeAssistantMessages(msg, normalizedMessage)
-                return
-              }
+            if (msg.message.id === normalizedMessage.message.id) {
+              result[i] = mergeAssistantMessages(msg, normalizedMessage)
+              return
             }
           }
 
@@ -3883,8 +3888,25 @@ Read the team config to discover your teammates' names. Check the task list peri
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- teammate_mailbox/team_context/skill_discovery/bagel_console handled above
-  // biome-ignore lint/nursery/useExhaustiveSwitchCases: teammate_mailbox/team_context/max_turns_reached/skill_discovery/bagel_console handled above, can't add case for dead code elimination
+  // tool_discovery handled here (not in the switch) so the 'tool_discovery'
+  // string literal lives inside a feature()-guarded block.
+  if (feature('EXPERIMENTAL_SEARCH_EXTRA_TOOLS')) {
+    const a = attachment as any
+    if (a.type === 'tool_discovery') {
+      if (a.tools.length === 0) return []
+      const lines = a.tools.map(
+        t => `- ${t.name}: ${t.description.slice(0, 100)}`,
+      )
+      return wrapMessagesInSystemReminder([
+        createUserMessage({
+          content: `The following tools were discovered as relevant to your task. To invoke them, you MUST use ExecuteExtraTool — this is the only way to call these tools. Do not read source code or reason about whether they are callable; just call ExecuteExtraTool({"tool_name": "<name>", "params": {...}}) directly.\n\n${lines.join('\n')}`,
+          isMeta: true,
+        }),
+      ])
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- teammate_mailbox/team_context/skill_discovery/tool_discovery/bagel_console handled above
   switch (attachment.type) {
     case 'directory': {
       return wrapMessagesInSystemReminder([
@@ -4556,7 +4578,7 @@ You have exited auto mode. The user may now want to interact more directly. You 
       }
       if (attachment.removedNames.length > 0) {
         parts.push(
-          `The following deferred tools are no longer available (their MCP server disconnected). Do not search for them — ToolSearch will return no match:\n${attachment.removedNames.join('\n')}`,
+          `The following deferred tools are no longer available (their MCP server disconnected). Do not search for them — SearchExtraTools will return no match:\n${attachment.removedNames.join('\n')}`,
         )
       }
       return wrapMessagesInSystemReminder([

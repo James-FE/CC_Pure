@@ -20,10 +20,9 @@ import {
   type GitHubActionsMetadata,
   getUserForGrowthBook,
 } from '../../utils/user.js'
-import {
-  is1PEventLoggingEnabled,
-  logGrowthBookExperimentTo1P,
-} from './firstPartyEventLogger.js'
+import { logGrowthBookExperimentTo1P } from './firstPartyEventLogger.js'
+
+const DEFAULT_API_HOST = 'api.anthropic.com' // core API host, not a telemetry endpoint
 
 /**
  * User attributes sent to GrowthBook for targeting.
@@ -466,9 +465,14 @@ const LOCAL_GATE_DEFAULTS: Record<string, unknown> = {
   tengu_birch_trellis: true, // Tree-sitter bash security analysis
   tengu_collage_kaleidoscope: true, // macOS clipboard image reading
   tengu_compact_cache_prefix: true, // Reuse prompt cache during compaction
+  tengu_kairos_assistant: true, // KAIROS assistant mode activation
   tengu_kairos_cron_durable: true, // Persistent cron tasks
   tengu_attribution_header: true, // API request attribution header
   tengu_slate_prism: true, // Agent progress summaries
+
+  // ── Ultrareview (cloud code review via CCR) ─────────────────────
+  tengu_review_bughunter_config: { enabled: true }, // /ultrareview command visibility
+  tengu_ccr_bundle_seed_enabled: true, // Bundle seed: skip GitHub App check for branch mode
 }
 
 /**
@@ -486,12 +490,13 @@ function getLocalGateDefault(feature: string): unknown | undefined {
  * Check if GrowthBook operations should be enabled
  */
 function isGrowthBookEnabled(): boolean {
-  // 适配器模式：有自定义服务器配置时直接启用
+  // Adapter mode is the only network-enabled mode in CCP. Without an explicit
+  // custom GrowthBook adapter, feature values come from env/config overrides
+  // and LOCAL_GATE_DEFAULTS only.
   if (process.env.CLAUDE_GB_ADAPTER_URL && process.env.CLAUDE_GB_ADAPTER_KEY) {
     return true
   }
-  // GrowthBook depends on 1P event logging.
-  return is1PEventLoggingEnabled()
+  return false
 }
 
 /**
@@ -503,15 +508,15 @@ function isGrowthBookEnabled(): boolean {
  * attributes. Without this, there's no stable attribute to target them on
  * — only per-device IDs. See src/utils/auth.ts isAnthropicAuthEnabled().
  *
- * Returns undefined for unset/default (api.anthropic.com) so the attribute
- * is absent for direct-API users. Hostname only — no path/query/creds.
+ * Returns undefined for unset/default Anthropic API host so the attribute is
+ * absent for direct-API users. Hostname only — no path/query/creds.
  */
 export function getApiBaseUrlHost(): string | undefined {
   const baseUrl = process.env.ANTHROPIC_BASE_URL
   if (!baseUrl) return undefined
   try {
     const host = new URL(baseUrl).host
-    if (host === 'api.anthropic.com') return undefined
+    if (host === DEFAULT_API_HOST) return undefined
     return host
   } catch {
     return undefined
@@ -565,11 +570,7 @@ const getGrowthBookClient = memoize(
 
     const attributes = getUserAttributes()
     const clientKey = getGrowthBookClientKey()
-    const baseUrl =
-      process.env.CLAUDE_GB_ADAPTER_URL ||
-      (process.env.USER_TYPE === 'ant'
-        ? process.env.CLAUDE_CODE_GB_BASE_URL || 'https://api.anthropic.com/'
-        : 'https://api.anthropic.com/')
+    const baseUrl = process.env.CLAUDE_GB_ADAPTER_URL
     const isAdapterMode = !!(
       process.env.CLAUDE_GB_ADAPTER_URL && process.env.CLAUDE_GB_ADAPTER_KEY
     )
@@ -830,6 +831,16 @@ export function getFeatureValue_CACHED_MAY_BE_STALE<T>(
     return localDefault !== undefined ? (localDefault as T) : defaultValue
   }
 
+  // LOCAL_GATE_DEFAULTS take priority over remote values and disk cache.
+  // In fork/self-hosted deployments, the GrowthBook server may push false
+  // for gates we intentionally enable. Local defaults represent the
+  // project's intentional configuration and override everything except
+  // env/config overrides (which are explicit user intent).
+  const localDefault = getLocalGateDefault(feature)
+  if (localDefault !== undefined) {
+    return localDefault as T
+  }
+
   // Log experiment exposure if data is available, otherwise defer until after init
   if (experimentDataByFeature.has(feature)) {
     logExposureForFeature(feature)
@@ -838,10 +849,6 @@ export function getFeatureValue_CACHED_MAY_BE_STALE<T>(
   }
 
   // In-memory payload is authoritative once processRemoteEvalPayload has run.
-  // Disk is also fresh by then (syncRemoteEvalToDisk runs synchronously inside
-  // init), so this is correctness-equivalent to the disk read below — but it
-  // skips the config JSON parse and is what onGrowthBookRefresh subscribers
-  // depend on to read fresh values the instant they're notified.
   if (remoteEvalFeatureValues.has(feature)) {
     return remoteEvalFeatureValues.get(feature) as T
   }
@@ -853,14 +860,9 @@ export function getFeatureValue_CACHED_MAY_BE_STALE<T>(
       return cached as T
     }
   } catch {
-    // Config not yet initialized — fall through to local gate defaults
+    // Config not yet initialized — fall through to defaultValue
   }
-  // Disk cache miss (or config not initialized) — use local gate defaults
-  // before falling back to the caller's defaultValue. This covers:
-  // 1. GrowthBook "enabled" but never connected (caches empty)
-  // 2. Config not yet initialized (early in startup)
-  const localDefault = getLocalGateDefault(feature)
-  return localDefault !== undefined ? (localDefault as T) : defaultValue
+  return defaultValue
 }
 
 /**
