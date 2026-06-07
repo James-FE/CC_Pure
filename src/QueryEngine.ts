@@ -86,7 +86,9 @@ import {
 
 // Lazy: MessageSelector.tsx pulls React/ink; only needed for message filtering at query time
 /* eslint-disable @typescript-eslint/no-require-imports */
-const messageSelector = (): typeof import('src/components/MessageSelector.js') | null => {
+const messageSelector = ():
+  | typeof import('src/components/MessageSelector.js')
+  | null => {
   try {
     return require('src/components/MessageSelector.js')
   } catch {
@@ -650,20 +652,19 @@ export class QueryEngine {
 
     if (fileHistoryEnabled() && persistSession) {
       const _sel = messageSelector()
-      const _filter = _sel?.selectableUserMessagesFilter ?? ((_msg: unknown) => true)
-      messagesFromUserInput
-        .filter(_filter)
-        .forEach(message => {
-          void fileHistoryMakeSnapshot(
-            (updater: (prev: FileHistoryState) => FileHistoryState) => {
-              setAppState(prev => ({
-                ...prev,
-                fileHistory: updater(prev.fileHistory),
-              }))
-            },
-            message.uuid,
-          )
-        })
+      const _filter =
+        _sel?.selectableUserMessagesFilter ?? ((_msg: unknown) => true)
+      messagesFromUserInput.filter(_filter).forEach(message => {
+        void fileHistoryMakeSnapshot(
+          (updater: (prev: FileHistoryState) => FileHistoryState) => {
+            setAppState(prev => ({
+              ...prev,
+              fileHistory: updater(prev.fileHistory),
+            }))
+          },
+          message.uuid,
+        )
+      })
     }
 
     // Track current message usage (reset on each message_start)
@@ -716,7 +717,8 @@ export class QueryEngine {
           message.subtype === 'compact_boundary'
         ) {
           const compactMsg = message as SystemCompactBoundaryMessage
-          const tailUuid = compactMsg.compactMetadata?.preservedSegment?.tailUuid
+          const tailUuid =
+            compactMsg.compactMetadata?.preservedSegment?.tailUuid
           if (tailUuid) {
             const tailIdx = this.mutableMessages.findLastIndex(
               m => m.uuid === tailUuid,
@@ -776,7 +778,10 @@ export class QueryEngine {
           // streamed responses, this is null at content_block_stop time;
           // the real value arrives via message_delta (handled below).
           const msg = message as Message
-          const stopReason = msg.message?.stop_reason as string | null | undefined
+          const stopReason = msg.message?.stop_reason as
+            | string
+            | null
+            | undefined
           if (stopReason != null) {
             lastStopReason = stopReason
           }
@@ -806,11 +811,15 @@ export class QueryEngine {
           break
         }
         case 'stream_event': {
-          const event = (message as unknown as { event: Record<string, unknown> }).event
+          const event = (
+            message as unknown as { event: Record<string, unknown> }
+          ).event
           if (event.type === 'message_start') {
             // Reset current message usage for new message
             currentMessageUsage = EMPTY_USAGE
-            const eventMessage = event.message as { usage: BetaMessageDeltaUsage }
+            const eventMessage = event.message as {
+              usage: BetaMessageDeltaUsage
+            }
             currentMessageUsage = updateUsage(
               currentMessageUsage,
               eventMessage.usage,
@@ -859,7 +868,15 @@ export class QueryEngine {
             void recordTranscript(messages)
           }
 
-          const attachment = msg.attachment as { type: string; data?: unknown; turnCount?: number; maxTurns?: number; prompt?: string; source_uuid?: string; [key: string]: unknown }
+          const attachment = msg.attachment as {
+            type: string
+            data?: unknown
+            turnCount?: number
+            maxTurns?: number
+            prompt?: string
+            source_uuid?: string
+            [key: string]: unknown
+          }
 
           // Extract structured output from StructuredOutput tool calls
           if (attachment.type === 'structured_output') {
@@ -900,10 +917,7 @@ export class QueryEngine {
             return
           }
           // Yield queued_command attachments as SDK user message replays
-          else if (
-            replayUserMessages &&
-            attachment.type === 'queued_command'
-          ) {
+          else if (replayUserMessages && attachment.type === 'queued_command') {
             yield {
               type: 'user',
               message: {
@@ -931,10 +945,7 @@ export class QueryEngine {
           // never shrinks (memory leak in long SDK sessions). The subtype
           // check lives inside the injected callback so feature-gated strings
           // stay out of this file (excluded-strings check).
-          const snipResult = this.config.snipReplay?.(
-            msg,
-            this.mutableMessages,
-          )
+          const snipResult = this.config.snipReplay?.(msg, this.mutableMessages)
           if (snipResult !== undefined) {
             if (snipResult.executed) {
               this.mutableMessages.length = 0
@@ -944,10 +955,7 @@ export class QueryEngine {
           }
           this.mutableMessages.push(msg)
           // Yield compact boundary messages to SDK
-          if (
-            msg.subtype === 'compact_boundary' &&
-            msg.compactMetadata
-          ) {
+          if (msg.subtype === 'compact_boundary' && msg.compactMetadata) {
             const compactMsg = msg as SystemCompactBoundaryMessage
             // Release pre-compaction messages for GC. The boundary was just
             // pushed so it's the last element. query.ts already uses
@@ -967,11 +975,18 @@ export class QueryEngine {
               subtype: 'compact_boundary' as const,
               session_id: getSessionId(),
               uuid: msg.uuid,
-              compact_metadata: toSDKCompactMetadata(compactMsg.compactMetadata),
+              compact_metadata: toSDKCompactMetadata(
+                compactMsg.compactMetadata,
+              ),
             }
           }
           if (msg.subtype === 'api_error') {
-            const apiErrorMsg = msg as Message & { retryAttempt: number; maxRetries: number; retryInMs: number; error: APIError }
+            const apiErrorMsg = msg as Message & {
+              retryAttempt: number
+              maxRetries: number
+              retryInMs: number
+              error: APIError
+            }
             yield {
               type: 'system',
               subtype: 'api_retry' as const,
@@ -997,7 +1012,10 @@ export class QueryEngine {
           break
         }
         case 'tool_use_summary': {
-          const msg = message as Message & { summary: unknown; precedingToolUseIds: unknown }
+          const msg = message as Message & {
+            summary: unknown
+            precedingToolUseIds: unknown
+          }
           // Yield tool use summary messages to SDK
           yield {
             type: 'tool_use_summary' as const,
@@ -1106,7 +1124,10 @@ export class QueryEngine {
     const edeResultType = result?.type ?? 'undefined'
     const edeLastContentType =
       result?.type === 'assistant'
-        ? (last(result.message!.content as import('@anthropic-ai/sdk/resources/beta/messages/messages.js').BetaContentBlock[])?.type ?? 'none')
+        ? (last(
+            result.message!
+              .content as import('@anthropic-ai/sdk/resources/beta/messages/messages.js').BetaContentBlock[],
+          )?.type ?? 'none')
         : 'n/a'
 
     // Flush buffered transcript writes before yielding result.
@@ -1164,7 +1185,10 @@ export class QueryEngine {
     let isApiError = false
 
     if (result.type === 'assistant') {
-      const lastContent = last(result.message!.content as import('@anthropic-ai/sdk/resources/beta/messages/messages.js').BetaContentBlock[])
+      const lastContent = last(
+        result.message!
+          .content as import('@anthropic-ai/sdk/resources/beta/messages/messages.js').BetaContentBlock[],
+      )
       if (
         lastContent?.type === 'text' &&
         !SYNTHETIC_MESSAGES.has(lastContent.text)
@@ -1199,6 +1223,17 @@ export class QueryEngine {
 
   interrupt(): void {
     this.abortController.abort()
+  }
+
+  /** Reset the abort controller so the next submitMessage() call can start
+   *  with a fresh, non-aborted signal. Must be called after interrupt(). */
+  resetAbortController(): void {
+    this.abortController = createAbortController()
+  }
+
+  /** Expose the current abort signal for external consumers (e.g. ACP bridge). */
+  getAbortSignal(): AbortSignal {
+    return this.abortController.signal
   }
 
   getMessages(): readonly Message[] {
