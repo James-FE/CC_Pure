@@ -3,6 +3,11 @@ import { env } from '../env.js'
 
 export const COMPUTER_USE_MCP_SERVER_NAME = 'computer-use'
 
+type CliComputerUseCapabilities = {
+  screenshotFiltering: 'native' | 'none'
+  platform: 'darwin' | 'win32' | 'linux'
+}
+
 /**
  * Sentinel bundle ID for the frontmost gate. Claude Code is a terminal — it has
  * no window. This never matches a real `NSWorkspace.frontmostApplication`, so
@@ -52,15 +57,14 @@ export function getTerminalBundleId(): string | null {
  * takes this shape (no `hostBundleId`, no `teachMode`).
  */
 export const CLI_CU_CAPABILITIES = {
-  screenshotFiltering: (process.platform === 'darwin'
-    ? 'native'
-    : 'none') as any,
-  platform: (process.platform === 'win32'
-    ? 'win32'
-    : process.platform === 'linux'
-      ? 'linux'
-      : 'darwin') as any,
-}
+  screenshotFiltering: process.platform === 'darwin' ? 'native' : 'none',
+  platform:
+    process.platform === 'win32'
+      ? 'win32'
+      : process.platform === 'linux'
+        ? 'linux'
+        : 'darwin',
+} satisfies CliComputerUseCapabilities
 
 export function isComputerUseMCPServer(name: string): boolean {
   return normalizeNameForMCP(name) === COMPUTER_USE_MCP_SERVER_NAME

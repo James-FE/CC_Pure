@@ -8,6 +8,12 @@ import {
 } from '@alcalzone/ansi-tokenize'
 import type { Theme } from './theme.js'
 
+type TextToken = Extract<Token, { type: 'char' }>
+
+function isTextToken(token: Token): token is TextToken {
+  return token.type === 'char'
+}
+
 export type TextHighlight = {
   start: number
   end: number
@@ -126,19 +132,23 @@ class HighlightSegmenter {
         this.codes.push(token)
         this.stringPos += token.code.length
         this.tokenIdx++
-      } else {
+      } else if (isTextToken(token)) {
+        const tokenValue = token.value
         const charsNeeded = targetVisiblePos - this.visiblePos
-        const charsAvailable = (token as any).value.length - this.charIdx
+        const charsAvailable = tokenValue.length - this.charIdx
         const charsToTake = Math.min(charsNeeded, charsAvailable)
 
         this.stringPos += charsToTake
         this.visiblePos += charsToTake
         this.charIdx += charsToTake
 
-        if (this.charIdx >= (token as any).value.length) {
+        if (this.charIdx >= tokenValue.length) {
           this.tokenIdx++
           this.charIdx = 0
         }
+      } else {
+        this.stringPos += token.code.length
+        this.tokenIdx++
       }
     }
 

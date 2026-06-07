@@ -1,7 +1,9 @@
 import {
   type AnsiCode,
+  type Char,
   ansiCodesToString,
   reduceAnsiCodes,
+  type Token,
   tokenize,
   undoAnsiCodes,
 } from '@alcalzone/ansi-tokenize'
@@ -15,6 +17,10 @@ function isEndCode(code: AnsiCode): boolean {
 // Filter to only include "start codes" (not end codes)
 function filterStartCodes(codes: AnsiCode[]): AnsiCode[] {
   return codes.filter(c => !isEndCode(c))
+}
+
+function isCharToken(token: Token): token is Char {
+  return token.type === 'char'
 }
 
 /**
@@ -43,7 +49,13 @@ export default function sliceAnsi(
     // pass start/end in display cells (via stringWidth), so position must
     // track the same units.
     const width =
-      token.type === 'ansi' ? 0 : token.type === 'char' ? (token.fullWidth ? 2 : stringWidth(token.value)) : 0
+      token.type === 'ansi'
+        ? 0
+        : token.type === 'char'
+          ? token.fullWidth
+            ? 2
+            : stringWidth(token.value)
+          : 0
 
     // Break AFTER trailing zero-width marks — a combining mark attaches to
     // the preceding base char, so "भा" (भ + ा, 1 display cell) sliced at
@@ -77,7 +89,7 @@ export default function sliceAnsi(
       }
 
       if (include) {
-        result += (token as any).value
+        result += isCharToken(token) ? token.value : token.code
       }
 
       position += width

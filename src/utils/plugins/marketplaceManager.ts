@@ -184,11 +184,15 @@ export function getDeclaredMarketplaces(): Record<string, DeclaredMarketplace> {
   // Lowest precedence: implicit < --add-dir < merged settings.
   // An explicit extraKnownMarketplaces entry for claude-plugins-official
   // in --add-dir or settings wins.
-  return {
+  const declared = {
     ...implicit,
-    ...getAddDirExtraMarketplaces(),
-    ...(getInitialSettings().extraKnownMarketplaces ?? {}),
-  } as any
+    ...(getAddDirExtraMarketplaces() as Record<string, DeclaredMarketplace>),
+    ...((getInitialSettings().extraKnownMarketplaces ?? {}) as Record<
+      string,
+      DeclaredMarketplace
+    >),
+  } satisfies Record<string, DeclaredMarketplace>
+  return declared
 }
 
 /**
