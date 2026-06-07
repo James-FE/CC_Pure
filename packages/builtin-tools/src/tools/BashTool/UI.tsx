@@ -17,6 +17,21 @@ import { getDisplayPath } from 'src/utils/file.js'
 import { isFullscreenEnvEnabled } from 'src/utils/fullscreen.js'
 import type { ThemeName } from 'src/utils/theme.js'
 import type { BashProgress, BashToolInput, Out } from '@claude-code-best/builtin-tools/tools/BashTool/BashTool.js'
+
+/**
+ * Local type describing the actual runtime shape of Bash progress data.
+ * BashProgress is `Record<string, unknown>`, so we need a concrete shape
+ * for property access without resorting to `as any`.
+ */
+type BashProgressData = {
+  fullOutput?: string
+  output?: string
+  elapsedTimeSeconds?: number
+  totalLines?: number
+  totalBytes?: number
+  timeoutMs?: number
+  taskId?: string
+}
 import BashToolResultMessage from '@claude-code-best/builtin-tools/tools/BashTool/BashToolResultMessage.js'
 import { extractBashCommentLabel } from '@claude-code-best/builtin-tools/tools/BashTool/commentLabel.js'
 import { parseSedEditCommand } from '@claude-code-best/builtin-tools/tools/BashTool/sedEditParser.js'
@@ -147,7 +162,7 @@ export function renderToolUseProgressMessage(
     )
   }
 
-  const data = lastProgress.data
+  const data = lastProgress.data as BashProgressData
 
   return (
     <ShellProgressMessage
@@ -187,7 +202,7 @@ export function renderToolResultMessage(
   },
 ): React.ReactNode {
   const lastProgress = progressMessagesForMessage.at(-1)
-  const timeoutMs = lastProgress?.data?.timeoutMs
+  const timeoutMs = (lastProgress?.data as BashProgressData | undefined)?.timeoutMs
   return (
     <BashToolResultMessage
       content={content}
