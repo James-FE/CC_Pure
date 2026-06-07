@@ -27,9 +27,11 @@ import {
 import { lazySchema } from '../../utils/lazySchema.js'
 import { parsePluginIdentifier } from '../../utils/plugins/pluginIdentifier.js'
 import { escapeXmlAttr } from '../../utils/xml.js'
+import { getSettingsForSource } from '../../utils/settings/settings.js'
 import {
   type ChannelAllowlistEntry,
   getChannelAllowlist,
+  isChannelsEnabled,
 } from './channelAllowlist.js'
 
 export const ChannelMessageNotificationSchema = lazySchema(() =>

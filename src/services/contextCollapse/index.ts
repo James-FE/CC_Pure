@@ -12,6 +12,10 @@ export function getStats(): CollapseStats {
   }
 }
 
+export function isContextCollapseEnabled(): boolean {
+  return false
+}
+
 export function subscribe(callback: () => void): () => void {
   return () => {}
 }

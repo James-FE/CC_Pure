@@ -37,6 +37,7 @@ import {
 } from './tasks.js'
 import { getPlanFilePath, getPlan } from './plans.js'
 import { getConnectedIdeName } from './ide.js'
+import { getSettings_DEPRECATED } from './settings/settings.js'
 import {
   getManagedAndUserConditionalRules,
   getMemoryFilesForNestedDirectory,
@@ -771,6 +772,7 @@ export async function getAttachments(
   const context = { ...toolUseContext, abortController }
 
   const isMainThread = !toolUseContext.agentId
+  let suppressNextDiscovery = false
 
   // Attachments which are added in response to on user input
   const userInputAttachments = input

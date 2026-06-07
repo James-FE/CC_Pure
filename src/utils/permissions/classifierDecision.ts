@@ -19,6 +19,7 @@ import { TEAM_CREATE_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/Tea
 import { TEAM_DELETE_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/TeamDeleteTool/constants.js'
 import { TODO_WRITE_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/TodoWriteTool/constants.js'
 import { SEARCH_EXTRA_TOOLS_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/SearchExtraToolsTool/prompt.js'
+import { WORKFLOW_TOOL_NAME as WORKFLOW_TOOL_NAME_VALUE } from '@claude-code-best/builtin-tools/tools/WorkflowTool/constants.js'
 import { YOLO_CLASSIFIER_TOOL_NAME } from './yoloClassifier.js'
 
 // Ant-only tool names: conditional require so Bun can DCE these in external builds.

@@ -3192,7 +3192,7 @@ export function REPL({
       // processTextPrompt) — both pushed length past 1 on turn one, so the
       // title silently fell through to the "Claude Code" default.
       if (!titleDisabled && !sessionTitle && !agentTitle && !haikuTitleAttemptedRef.current) {
-        const firstUserMessage = newMessages.find(m => m.type === 'user' && !m.isMeta);
+        const firstUserMessage = _newMessages.find(m => m.type === 'user' && !m.isMeta);
         const text =
           firstUserMessage?.type === 'user'
             ? getContentText(firstUserMessage.message!.content as string | ContentBlockParam[])
@@ -3257,7 +3257,7 @@ export function REPL({
         // Manual /compact sets messages directly (shouldQuery=false) bypassing
         // handleMessageFromStream. Clear context-blocked if a compact boundary
         // is present so proactive ticks resume after compaction.
-        if (newMessages.some(isCompactBoundaryMessage)) {
+        if (_newMessages.some(isCompactBoundaryMessage)) {
           // Bump conversationId so Messages.tsx row keys change and
           // stale memoized rows remount with post-compact content.
           setConversationId(randomUUID());
@@ -3272,7 +3272,7 @@ export function REPL({
 
       const toolUseContext = getToolUseContext(
         messagesIncludingNewMessages,
-        newMessages,
+        _newMessages,
         abortController,
         mainLoopModelParam,
       );

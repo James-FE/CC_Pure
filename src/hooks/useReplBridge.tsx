@@ -323,7 +323,7 @@ export function useReplBridge(
                   };
                 });
                 // Notify model about newly available bridge-dependent tools
-                if (!wasSessionActive) {
+                if (!replBridgeSessionActive) {
                   setMessages(prev => [
                     ...prev,
                     createSystemMessage(

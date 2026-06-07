@@ -457,7 +457,7 @@ function PromptInput({
   const [showFastModePicker, setShowFastModePicker] = useState(false);
   const [showThinkingToggle, setShowThinkingToggle] = useState(false);
   const [showAutoModeOptIn, setShowAutoModeOptIn] = useState(false);
-  const [previousModeBeforeAuto, setPreviousModeBeforeAuto] = useState<PermissionMode | null>(null);
+  const [previousModeBeforeAuto, setPreviousModeBeforeAuto] = useState<PermissionName | null>(null);
   const autoModeOptInTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check if cursor is on the first line of input

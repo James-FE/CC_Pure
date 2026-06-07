@@ -75,7 +75,7 @@ export function registerToolMessage(
   groupIds: string[],
 ): void {
   for (const id of groupIds) {
-    registerToolResult(state, id)
+    registerToolResult(_state, id)
   }
 }
 

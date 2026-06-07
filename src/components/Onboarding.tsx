@@ -123,7 +123,7 @@ export function Onboarding({ onDone }: Props): React.ReactNode {
     </Box>
   )
 
-  const _preflightStep = <PreflightStep onSuccess={goToNextStep} />  // Create the steps array - determine which steps to include based on reAuth and oauthEnabled
+  const preflightStep = <PreflightStep onSuccess={goToNextStep} />  // Create the steps array - determine which steps to include based on reAuth and oauthEnabled
   const apiKeyNeedingApproval = useMemo(() => {
     // Add API key step if needed
     // On homespace, ANTHROPIC_API_KEY is preserved in process.env for child

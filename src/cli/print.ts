@@ -747,7 +747,7 @@ export async function runHeadless(
     const result = await handleRewindFiles(
       options.rewindFiles as UUID,
       currentAppState,
-      _setAppState,
+      setAppState,
       false,
     )
     if (!result.canRewind) {
