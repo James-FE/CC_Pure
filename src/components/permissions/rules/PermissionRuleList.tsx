@@ -642,7 +642,8 @@ export function PermissionRuleList({ onExit, initialTab, onRetryDenials }: Props
     onHeaderFocusChange: handleHeaderFocusChange,
   };
 
-  const isHidden = !!addingRuleToTab;
+  const isHidden =
+    !!selectedRule || !!addingRuleToTab || !!validatedRule || isAddingWorkspaceDirectory || !!removingDirectory;
 
   return (
     <Box flexDirection="column" onKeyDown={handleKeyDown}>
