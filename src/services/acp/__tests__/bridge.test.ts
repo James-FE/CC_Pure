@@ -683,7 +683,7 @@ describe('toDisplayPath', () => {
 // ── forwardSessionUpdates ─────────────────────────────────────────
 
 describe('nextSdkMessageOrAbort', () => {
-  test('returns undefined when aborted while waiting for next message', async () => {
+  test('returns done:true when aborted while waiting for next message', async () => {
     const ac = new AbortController()
     const pending = nextSdkMessageOrAbort(makeWaitingStream(), ac.signal)
     ac.abort()
@@ -693,19 +693,19 @@ describe('nextSdkMessageOrAbort', () => {
       new Promise<'timeout'>(resolve => setTimeout(resolve, 100, 'timeout')),
     ])
 
-    expect(result).toBeUndefined()
+    expect(result).toEqual({ done: true, value: undefined })
   })
 
-  test('returns undefined when stream is done', async () => {
+  test('returns done:true when stream is done', async () => {
     const result = await nextSdkMessageOrAbort(
       makeStream([]),
       new AbortController().signal,
     )
 
-    expect(result).toBeUndefined()
+    expect(result).toEqual({ done: true, value: undefined })
   })
 
-  test('returns a valid SDKMessage', async () => {
+  test('returns a valid SDKMessage via IteratorResult', async () => {
     const msg = {
       type: 'assistant',
       message: {
@@ -719,7 +719,7 @@ describe('nextSdkMessageOrAbort', () => {
       new AbortController().signal,
     )
 
-    expect(result).toBe(msg)
+    expect(result).toEqual({ done: false, value: msg })
   })
 })
 

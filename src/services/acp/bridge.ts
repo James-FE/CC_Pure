@@ -719,28 +719,22 @@ export function toolUpdateFromEditToolResponse(toolResponse: unknown): {
 export function nextSdkMessageOrAbort(
   sdkMessages: AsyncGenerator<SDKMessage, void, unknown>,
   abortSignal: AbortSignal,
-): Promise<SDKMessage | undefined> {
+): Promise<IteratorResult<SDKMessage, void>> {
   if (abortSignal.aborted) {
-    return Promise.resolve(undefined)
+    return Promise.resolve({ done: true, value: undefined })
   }
   let abortHandler: (() => void) | undefined
-  const abortPromise = new Promise<undefined>(resolve => {
-    abortHandler = () => resolve(undefined)
-    abortSignal.addEventListener('abort', abortHandler, { once: true })
+  const abortPromise = new Promise<IteratorResult<SDKMessage, void>>(
+    resolve => {
+      abortHandler = () => resolve({ done: true, value: undefined })
+      abortSignal.addEventListener('abort', abortHandler, { once: true })
+    },
+  )
+  return Promise.race([sdkMessages.next(), abortPromise]).finally(() => {
+    if (abortHandler) {
+      abortSignal.removeEventListener('abort', abortHandler)
+    }
   })
-  const nextPromise = sdkMessages.next()
-  return Promise.race([nextPromise, abortPromise])
-    .then(result => {
-      if (result === undefined) {
-        void nextPromise.catch(() => {})
-        return undefined
-      }
-      if (result.done === true) return undefined
-      return result.value
-    })
-    .finally(() => {
-      if (abortHandler) abortSignal.removeEventListener('abort', abortHandler)
-    })
 }
 
 // ── Main forwarding function ──────────────────────────────────────
@@ -779,8 +773,10 @@ export async function forwardSessionUpdates(
       // Race the next message against the abort signal so we unblock
       // immediately when cancelled, even if the generator is waiting for
       // a slow API response.
-      const rawMsg = await nextSdkMessageOrAbort(sdkMessages, abortSignal)
-      if (rawMsg === undefined || abortSignal.aborted) break
+      const nextResult = await nextSdkMessageOrAbort(sdkMessages, abortSignal)
+      if (nextResult.done || abortSignal.aborted) break
+      const rawMsg = nextResult.value
+      if (rawMsg == null) continue
       const msg = rawMsg as BridgeSDKMessage
 
       switch (msg.type) {
