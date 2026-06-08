@@ -164,7 +164,7 @@ export class RcsUpstreamClient {
               console.log(`  🔗 Dashboard: ${webBase}/code/`);
             }
             if (this.agentId) {
-              console.log(`     Agent ID: ${sanitizeLog(this.agentId)}`);
+              console.log("     Agent ID: %s", sanitizeLog(this.agentId));
             }
             console.log();
             resolve();

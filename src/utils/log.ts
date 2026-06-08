@@ -21,7 +21,7 @@ import { isEnvTruthy } from './envUtils.js'
 import { toError, shortErrorStack } from './errors.js'
 import { isEssentialTrafficOnly } from './privacyLevel.js'
 import { jsonParse } from './slowOperations.js'
-import { sanitizeLog } from './sensitive.js'
+import { redactForLog, sanitizeLog } from './sensitive.js'
 
 /**
  * Gets the display title for a log/session with fallback logic.
@@ -160,7 +160,8 @@ const isHardFailMode = memoize((): boolean => {
 export function logError(error: unknown): void {
   const err = toError(error)
   if (feature('HARD_FAIL') && isHardFailMode()) {
-    console.error('[HARD FAIL] logError called with:', sanitizeLog(err.stack || err.message))
+    const hardFailMessage = sanitizeLog(redactForLog(err.stack || err.message))
+    console.error('[HARD FAIL] logError called with: %s', hardFailMessage)
     // eslint-disable-next-line custom-rules/no-process-exit
     process.exit(1)
   }

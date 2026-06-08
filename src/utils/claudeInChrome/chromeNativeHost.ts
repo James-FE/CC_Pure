@@ -20,10 +20,9 @@ import { homedir, platform } from 'os'
 import { join } from 'path'
 import { z } from 'zod'
 import { lazySchema } from '../lazySchema.js'
-import { redactForLog } from '../sensitive.js'
+import { redactForLog, sanitizeLog } from '../sensitive.js'
 import { jsonParse, jsonStringify } from '../slowOperations.js'
 import { getSecureSocketPath, getSocketDir } from './common.js'
-import { sanitizeLog } from '../sensitive.js'
 
 const VERSION = '1.0.0'
 const MAX_MESSAGE_SIZE = 1024 * 1024 // 1MB - Max message size that can be sent to Chrome
@@ -33,19 +32,37 @@ const LOG_FILE =
     ? join(homedir(), '.claude', 'debug', 'chrome-native-host.txt')
     : undefined
 
+function safeLogText(arg: unknown): string {
+  let text: string
+  if (typeof arg === 'string') {
+    text = arg
+  } else {
+    try {
+      text = jsonStringify(arg)
+    } catch {
+      text = String(arg)
+    }
+  }
+  return sanitizeLog(redactForLog(text))
+}
+
 function log(message: string, ...args: unknown[]): void {
-  const redactedMessage = redactForLog(message)
+  const safeMessage = safeLogText(message)
+  const safeArgs = args.map(safeLogText)
   if (LOG_FILE) {
     const timestamp = new Date().toISOString()
-    const formattedArgs = args.length > 0 ? ' ' + jsonStringify(args) : ''
-    const logLine = `[${timestamp}] [Claude Chrome Native Host] ${redactedMessage}${formattedArgs}\n`
+    const formattedArgs = safeArgs.length > 0 ? ' ' + safeArgs.join(' ') : ''
+    const logLine = `[${timestamp}] [Claude Chrome Native Host] ${safeMessage}${formattedArgs}\n`
     // Fire-and-forget: logging is best-effort and callers (including event
     // handlers) don't await
     void appendFile(LOG_FILE, logLine).catch(() => {
       // Ignore file write errors
     })
   }
-  console.error(`[Claude Chrome Native Host] ${redactedMessage}`, ...args.map(a => sanitizeLog(a)))
+  console.error(
+    '%s',
+    [`[Claude Chrome Native Host] ${safeMessage}`, ...safeArgs].join(' '),
+  )
 }
 /**
  * Send a message to stdout (Chrome native messaging protocol)

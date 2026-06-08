@@ -19,8 +19,7 @@ import { redactForLog, sanitizeLog } from '../utils/sensitive.js'
 
 /** Write an error message to stderr (if given) and exit with code 1. */
 export function cliError(msg?: string): never {
-  // biome-ignore lint/suspicious/noConsole: centralized CLI error output
-  if (msg) console.error(sanitizeLog(redactForLog(msg)))
+  if (msg) console.error('%s', sanitizeLog(redactForLog(msg)))
   process.exit(1)
   return undefined as never
 }

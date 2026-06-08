@@ -642,16 +642,16 @@ export class ACPClient {
         result = String(arg)
       }
     }
-    // Prevent log injection: escape CR/LF so output stays on one line
-    return result.replace(/[\r\n]/g, '↵')
+    // Prevent log injection: strip CR/LF so output stays on one line.
+    return result.replace(/[\r\n]/g, ' ')
   }
 
   private _log(...args: unknown[]): void {
-    console.log(...args.map(a => this._sanitize(a)))
+    console.log('%s', args.map(a => this._sanitize(a)).join(' '))
   }
 
   private _error(...args: unknown[]): void {
-    console.error(...args.map(a => this._sanitize(a)))
+    console.error('%s', args.map(a => this._sanitize(a)).join(' '))
   }
 
   private send(message: ProxyMessage): void {
