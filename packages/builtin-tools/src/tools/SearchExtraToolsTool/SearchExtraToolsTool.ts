@@ -25,7 +25,6 @@ import {
   getToolIndex,
   searchTools,
 } from 'src/services/searchExtraTools/toolIndex.js'
-import type { SearchExtraToolsResult } from 'src/services/searchExtraTools/toolIndex.js'
 
 const KEYWORD_WEIGHT = Number(
   process.env.SEARCH_EXTRA_TOOLS_WEIGHT_KEYWORD ?? '0.4',
@@ -446,17 +445,6 @@ export const SearchExtraToolsTool = buildTool({
       const discoverQuery = discoverMatch[1]!.trim()
       const index = await getToolIndex(deferredTools)
       const tfIdfResults = searchTools(discoverQuery, index, max_results)
-      const textResults = tfIdfResults.map(r => {
-        let line = `**${r.name}** (score: ${r.score.toFixed(2)})\n${r.description}`
-        if (r.inputSchema) {
-          line += `\nSchema: ${JSON.stringify(r.inputSchema)}`
-        }
-        return line
-      })
-      const text =
-        textResults.length > 0
-          ? `Found ${textResults.length} tools:\n${textResults.join('\n\n')}`
-          : 'No matching deferred tools found'
       logSearchOutcome(
         tfIdfResults.map(r => r.name),
         'keyword',

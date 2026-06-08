@@ -13,12 +13,6 @@ const USAGE = 'Usage: /local-vault list | set KEY VALUE | get KEY [--reveal] | d
 
 type LocalVaultViewProps = React.ComponentProps<typeof LocalVaultView>;
 
-type LocalVaultAction = {
-  label: string;
-  description: string;
-  run: () => void;
-};
-
 const ACTION_LABEL_COLUMN_WIDTH = 26;
 
 function formatKeyList(keys: string[]): string {

@@ -21,12 +21,6 @@ const USAGE =
 
 type LocalMemoryViewProps = React.ComponentProps<typeof LocalMemoryView>;
 
-type LocalMemoryAction = {
-  label: string;
-  description: string;
-  run: () => void;
-};
-
 const ACTION_LABEL_COLUMN_WIDTH = 26;
 
 function formatStoreList(stores: string[]): string {

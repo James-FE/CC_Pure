@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { ProcessManager } from "./manager.js";
 import { createApp } from "./routes.js";

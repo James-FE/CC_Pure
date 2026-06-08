@@ -188,17 +188,6 @@ function asRecord(args: unknown): Record<string, unknown> {
   return {}
 }
 
-function requireNumber(
-  args: Record<string, unknown>,
-  key: string,
-): number | Error {
-  const v = args[key]
-  if (typeof v !== 'number' || !Number.isFinite(v)) {
-    return new Error(`"${key}" must be a finite number.`)
-  }
-  return v
-}
-
 function requireString(
   args: Record<string, unknown>,
   key: string,
@@ -1004,7 +993,6 @@ async function handleRequestAccess(
     bundleId: string
     reason: 'user_denied' | 'not_installed'
   }> = []
-  let dialogFlags: CuGrantFlags = overrides.grantFlags
 
   if (needDialog.length > 0 || Object.keys(requestedFlags).length > 0) {
     const req: CuPermissionRequest = {
@@ -1022,7 +1010,6 @@ async function handleRequestAccess(
     const response = await overrides.onPermissionRequest(req)
     dialogGranted = response.granted
     dialogDenied = response.denied
-    dialogFlags = response.flags
   }
 
   // Do NOT return display geometry or coordinateMode. See COORDINATES.md

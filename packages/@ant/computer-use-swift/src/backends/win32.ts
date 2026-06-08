@@ -6,9 +6,8 @@
  */
 
 import type {
-  AppInfo, AppsAPI, DisplayAPI, DisplayGeometry, InstalledApp,
-  PrepareDisplayResult, RunningApp, ScreenshotAPI, ScreenshotResult,
-  SwiftBackend, WindowDisplayInfo,
+  AppsAPI, DisplayAPI, DisplayGeometry,
+  ScreenshotAPI, ScreenshotResult,
 } from '../types.js'
 
 // CC_Pure: Linux-native build — Win32 imports stubbed (cross-package resolution unavailable)
@@ -68,7 +67,7 @@ foreach ($s in [System.Windows.Forms.Screen]::AllScreens) {
 $result -join "|"
 `)
       return raw.split('|').filter(Boolean).map(entry => {
-        const [w, h, id, primary] = entry.split(',')
+        const [w, h, id] = entry.split(',')
         return {
           width: Number(w),
           height: Number(h),

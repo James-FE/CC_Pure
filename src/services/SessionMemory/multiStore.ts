@@ -20,7 +20,7 @@ import {
   closeSync,
   writeFileSync,
 } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
+import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { validateKey } from '../../utils/localValidate.js'

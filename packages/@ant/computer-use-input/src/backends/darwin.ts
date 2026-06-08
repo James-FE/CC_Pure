@@ -6,7 +6,7 @@
  */
 
 import { $ } from 'bun'
-import type { FrontmostAppInfo, InputBackend } from '../types.js'
+import type { InputBackend } from '../types.js'
 
 const KEY_MAP: Record<string, number> = {
   return: 36, enter: 36, tab: 48, space: 49, delete: 51, backspace: 51,

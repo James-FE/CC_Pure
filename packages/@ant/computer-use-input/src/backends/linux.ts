@@ -5,7 +5,7 @@
  * Requires: xdotool (apt install xdotool)
  */
 
-import type { FrontmostAppInfo, InputBackend } from '../types.js'
+import type { InputBackend } from '../types.js'
 
 // ---------------------------------------------------------------------------
 // Shell helper — run a command and return trimmed stdout
@@ -18,13 +18,6 @@ function run(cmd: string[]): string {
     stderr: 'pipe',
   })
   return new TextDecoder().decode(result.stdout).trim()
-}
-
-async function runAsync(cmd: string[]): Promise<string> {
-  const proc = Bun.spawn(cmd, { stdout: 'pipe', stderr: 'pipe' })
-  const out = await new Response(proc.stdout).text()
-  await proc.exited
-  return out.trim()
 }
 
 // ---------------------------------------------------------------------------

@@ -9,9 +9,8 @@ import { readFileSync, unlinkSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type {
-  AppInfo, AppsAPI, DisplayAPI, DisplayGeometry, InstalledApp,
-  PrepareDisplayResult, RunningApp, ScreenshotAPI, ScreenshotResult,
-  SwiftBackend, WindowDisplayInfo,
+  AppsAPI, DisplayAPI, DisplayGeometry, InstalledApp,
+  ScreenshotAPI,
 } from '../types.js'
 
 export type {
@@ -32,14 +31,6 @@ export type {
 function jxaSync(script: string): string {
   const result = Bun.spawnSync({
     cmd: ['osascript', '-l', 'JavaScript', '-e', script],
-    stdout: 'pipe', stderr: 'pipe',
-  })
-  return new TextDecoder().decode(result.stdout).trim()
-}
-
-function osascriptSync(script: string): string {
-  const result = Bun.spawnSync({
-    cmd: ['osascript', '-e', script],
     stdout: 'pipe', stderr: 'pipe',
   })
   return new TextDecoder().decode(result.stdout).trim()

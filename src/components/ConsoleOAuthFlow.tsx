@@ -595,15 +595,6 @@ function OAuthStatusMessage({
         [activeField, baseUrl, apiKey, haikuModel, sonnetModel, opusModel],
       );
 
-      const _switchTo = useCallback(
-        (target: Field) => {
-          setOAuthStatus(buildState(activeField, inputValue, target));
-          setInputValue(displayValues[target] ?? '');
-          setInputCursorOffset((displayValues[target] ?? '').length);
-        },
-        [activeField, inputValue, displayValues, buildState, setOAuthStatus],
-      );
-
       const doSave = useCallback(() => {
         const finalVals = { ...displayValues, [activeField]: inputValue };
         const env: Record<string, string> = {};

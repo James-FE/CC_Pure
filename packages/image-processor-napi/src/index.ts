@@ -61,7 +61,6 @@ return "${tmpPath}"
           return null
         }
 
-        const file = Bun.file(tmpPath)
         // Use synchronous read via Node compat
         const fs = require('fs')
         const buffer: Buffer = fs.readFileSync(tmpPath)

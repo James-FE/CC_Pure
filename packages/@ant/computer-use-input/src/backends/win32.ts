@@ -7,7 +7,7 @@
  * All P/Invoke types are compiled once at module load and reused across calls.
  */
 
-import type { FrontmostAppInfo, InputBackend } from '../types.js'
+import type { InputBackend } from '../types.js'
 
 // ---------------------------------------------------------------------------
 // PowerShell helper — run a script and return trimmed stdout
@@ -22,15 +22,7 @@ function ps(script: string): string {
   return new TextDecoder().decode(result.stdout).trim()
 }
 
-async function psAsync(script: string): Promise<string> {
-  const proc = Bun.spawn(
-    ['powershell', '-NoProfile', '-NonInteractive', '-Command', script],
-    { stdout: 'pipe', stderr: 'pipe' },
-  )
-  const out = await new Response(proc.stdout).text()
-  await proc.exited
-  return out.trim()
-}
+
 
 // ---------------------------------------------------------------------------
 // P/Invoke type definitions (compiled once, cached by PowerShell session)

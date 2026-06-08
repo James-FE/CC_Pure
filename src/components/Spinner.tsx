@@ -252,8 +252,6 @@ function SpinnerWithVerbInner({
   const shimmerColor = overrideShimmerColor ?? defaultShimmerColor;
 
   // TTFT display is gated to internal builds — apiMetricsRef was removed from
-  // props during a refactor, so skip this until it's re-threaded.
-  const _ttftText: string | null = null;
 
   // When leader is idle but teammates are running (and we're viewing the leader),
   // show a static dim idle display instead of the animated spinner — otherwise

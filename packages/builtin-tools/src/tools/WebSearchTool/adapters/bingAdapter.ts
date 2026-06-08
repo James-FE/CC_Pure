@@ -194,7 +194,6 @@ export function resolveBingUrl(rawUrl: string): string | undefined {
   if (uMatch) {
     const encoded = uMatch[1]
     if (encoded.length >= 3) {
-      const prefix = encoded.slice(0, 2)
       const b64 = encoded.slice(2)
       try {
         // Base64url decode (pad as needed)

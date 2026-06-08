@@ -588,11 +588,6 @@ interface ContentBlock {
   name?: string;
 }
 
-interface ProxyMessage {
-  type: "connect" | "disconnect" | "new_session" | "prompt" | "cancel" | "set_session_model";
-  payload?: { cwd?: string } | { content: ContentBlock[] } | { modelId: string };
-}
-
 export async function startServer(config: ServerConfig): Promise<void> {
   const { port, host, command, args, cwd, token, https } = config;
 

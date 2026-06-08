@@ -8,7 +8,7 @@ import {
 } from 'fs'
 import noop from 'lodash-es/noop.js'
 import throttle from 'lodash-es/throttle.js'
-import React, { type ReactNode } from 'react'
+import { ReactNode } from 'react'
 import type { FiberRoot } from 'react-reconciler'
 import { ConcurrentRoot } from 'react-reconciler/constants.js'
 import { onExit } from 'signal-exit'

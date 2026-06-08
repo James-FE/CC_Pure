@@ -10,7 +10,7 @@
 import type {
   AppInfo, AppsAPI, DisplayAPI, DisplayGeometry, InstalledApp,
   PrepareDisplayResult, RunningApp, ScreenshotAPI, ScreenshotResult,
-  SwiftBackend, WindowDisplayInfo,
+  WindowDisplayInfo,
 } from '../types.js'
 
 // ---------------------------------------------------------------------------

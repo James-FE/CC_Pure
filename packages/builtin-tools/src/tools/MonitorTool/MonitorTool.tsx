@@ -1,4 +1,3 @@
-import React from 'react';
 import { Text } from '@anthropic/ink';
 import { z } from 'zod/v4';
 import { TOOL_SUMMARY_MAX_LENGTH } from 'src/constants/toolLimits.js';

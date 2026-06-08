@@ -1,5 +1,4 @@
 import type {
-  BetaContentBlockParam,
   BetaToolResultBlockParam,
   BetaToolUseBlock,
 } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'

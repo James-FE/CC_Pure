@@ -2,9 +2,7 @@ import { z } from 'zod/v4'
 import {
   buildTool,
   findToolByName,
-  type Tool,
   type ToolDef,
-  type ToolUseContext,
   type ToolResult,
   type Tools,
   type ValidationResult,
