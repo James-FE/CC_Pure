@@ -885,15 +885,6 @@ export function BrowseMarketplace({
         </Box>
       )}
 
-      {/* Error messages shown in the UI */}
-      {error && (
-        <Box marginTop={1}>
-          <Text color="error">
-            {figures.cross} {error}
-          </Text>
-        </Box>
-      )}
-
       <PluginSelectionKeyHint hasSelection={selectedForInstall.size > 0} />
     </Box>
   );

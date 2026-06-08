@@ -2385,15 +2385,12 @@ export function normalizeMessagesForAPI(
           // tool_result content, as these are only valid with the tool search beta.
           // When tool search IS enabled, strip only tool_reference blocks for
           // tools that no longer exist (e.g., MCP server was disconnected).
-          let normalizedMessage = message
-          if (!isSearchExtraToolsEnabledOptimistic()) {
-            normalizedMessage = stripToolReferenceBlocksFromUserMessage(message)
-          } else {
-            normalizedMessage = stripUnavailableToolReferencesFromUserMessage(
-              message,
-              availableToolNames,
-            )
-          }
+          let normalizedMessage = !isSearchExtraToolsEnabledOptimistic()
+            ? stripToolReferenceBlocksFromUserMessage(message)
+            : stripUnavailableToolReferencesFromUserMessage(
+                message,
+                availableToolNames,
+              )
 
           // Strip document/image blocks from the specific meta user message that
           // preceded a PDF/image/request-too-large error, to prevent re-sending

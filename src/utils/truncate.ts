@@ -45,11 +45,6 @@ export function truncatePathMiddle(path: string, maxLength: number): string {
   // Result format: directory + "…" + filename
   const availableForDir = maxLength - 1 - filenameWidth // -1 for ellipsis
 
-  if (availableForDir <= 0) {
-    // No room for directory, just show filename (truncated if needed)
-    return truncateStartToWidth(filename, maxLength)
-  }
-
   // Truncate directory and combine
   const truncatedDir = truncateToWidthNoEllipsis(directory, availableForDir)
   return truncatedDir + '…' + filename
