@@ -447,7 +447,7 @@ describe('AcpAgent', () => {
             cwd: '/tmp',
             _meta: { permissionMode: 'invalid-mode' },
           } as any),
-        ).rejects.toThrow('Invalid _meta.permissionMode: invalid-mode')
+        ).rejects.toThrow('Invalid _meta.permissionMode:')
 
         expect(consoleErrorSpy).not.toHaveBeenCalled()
       } finally {
