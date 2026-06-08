@@ -97,10 +97,16 @@ const TASK_ID_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz'
 
 export function generateTaskId(type: TaskType): string {
   const prefix = getTaskIdPrefix(type)
-  const bytes = randomBytes(8)
+  const alphabetLen = TASK_ID_ALPHABET.length
+  // Use rejection sampling to avoid modulo bias
+  const maxValid = Math.floor(256 / alphabetLen) * alphabetLen
   let id = prefix
   for (let i = 0; i < 8; i++) {
-    id += TASK_ID_ALPHABET[bytes[i]! % TASK_ID_ALPHABET.length]
+    let byte: number
+    do {
+      byte = randomBytes(1)[0]!
+    } while (byte >= maxValid)
+    id += TASK_ID_ALPHABET[byte % alphabetLen]
   }
   return id
 }

@@ -73,10 +73,16 @@ const DEFAULT_MAIN_SESSION_AGENT: CustomAgentDefinition = {
 const TASK_ID_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz'
 
 function generateMainSessionTaskId(): string {
-  const bytes = randomBytes(8)
+  const alphabetLen = TASK_ID_ALPHABET.length
+  // Use rejection sampling to avoid modulo bias
+  const maxValid = Math.floor(256 / alphabetLen) * alphabetLen
   let id = 's'
   for (let i = 0; i < 8; i++) {
-    id += TASK_ID_ALPHABET[bytes[i]! % TASK_ID_ALPHABET.length]
+    let byte: number
+    do {
+      byte = randomBytes(1)[0]!
+    } while (byte >= maxValid)
+    id += TASK_ID_ALPHABET[byte % alphabetLen]
   }
   return id
 }
@@ -210,7 +216,10 @@ export function completeMainSessionTask(
     // Set notified so evictTerminalTask/generateTaskAttachments eviction
     // guards pass; the backgrounded path sets this inside
     // enqueueMainSessionNotification's check-and-set.
-    updateTaskState<LocalMainSessionTaskState>(taskId, setAppState, task => ({ ...task, notified: true }))
+    updateTaskState<LocalMainSessionTaskState>(taskId, setAppState, task => ({
+      ...task,
+      notified: true,
+    }))
     emitTaskTerminatedSdk(taskId, success ? 'completed' : 'failed', {
       toolUseId,
       summary: 'Background session',
@@ -388,10 +397,14 @@ export function startBackgroundSession({
           // Aborted mid-stream — completeMainSessionTask won't be reached.
           // chat:killAgents path already marked notified + emitted; stopTask path did not.
           let alreadyNotified = false
-          updateTaskState<LocalMainSessionTaskState>(taskId, setAppState, task => {
-            alreadyNotified = task.notified === true
-            return alreadyNotified ? task : { ...task, notified: true }
-          })
+          updateTaskState<LocalMainSessionTaskState>(
+            taskId,
+            setAppState,
+            task => {
+              alreadyNotified = task.notified === true
+              return alreadyNotified ? task : { ...task, notified: true }
+            },
+          )
           if (!alreadyNotified) {
             emitTaskTerminatedSdk(taskId, 'stopped', {
               summary: description,
@@ -420,7 +433,12 @@ export function startBackgroundSession({
         lastRecordedUuid = msg.uuid
 
         if (msg.type === 'assistant') {
-          const contentBlocks = (msg.message?.content ?? []) as Array<{ type: string; text?: string; name?: string; input?: unknown }>
+          const contentBlocks = (msg.message?.content ?? []) as Array<{
+            type: string
+            text?: string
+            name?: string
+            input?: unknown
+          }>
           for (const block of contentBlocks) {
             if (block.type === 'text') {
               tokenCount += roughTokenCountEstimation(block.text ?? '')

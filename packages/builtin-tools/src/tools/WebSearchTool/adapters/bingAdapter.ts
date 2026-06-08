@@ -211,7 +211,7 @@ export function resolveBingUrl(rawUrl: string): string | undefined {
   // Use proper URL parsing rather than substring matching to prevent bypass
   try {
     const parsed = new URL(rawUrl)
-    if (!parsed.hostname.includes('bing.com')) return rawUrl
+    if (!(parsed.hostname === 'bing.com' || parsed.hostname.endsWith('.bing.com'))) return rawUrl
   } catch {
     // Invalid URL — treat as non-external
     return undefined

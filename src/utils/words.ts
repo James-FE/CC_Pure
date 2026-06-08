@@ -765,9 +765,12 @@ const VERBS = [
  * Generate a cryptographically random integer in the range [0, max)
  */
 function randomInt(max: number): number {
-  // Use crypto.randomBytes for better randomness than Math.random
-  const bytes = randomBytes(4)
-  const value = bytes.readUInt32BE(0)
+  // Use rejection sampling to avoid modulo bias
+  const maxValid = Math.floor(0x100000000 / max) * max
+  let value: number
+  do {
+    value = randomBytes(4).readUInt32BE(0)
+  } while (value >= maxValid)
   return value % max
 }
 
