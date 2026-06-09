@@ -39,7 +39,7 @@ jobs:
           # Show last 30 lines of test output
           tail -30 /tmp/ci-test.log
           if [ "$FAILS" -le 0 ]; then
-            echo "✅ All tests pass — zero failures"
+            echo "✅ Test baseline OK"
           else
             echo "❌ Test regressions detected"
             exit 1
