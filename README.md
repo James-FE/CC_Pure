@@ -2,8 +2,8 @@
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-black?style=flat-square&logo=bun)](https://bun.sh/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)]()
-[![Tests](https://img.shields.io/badge/tests-3919-brightgreen?style=flat-square)]()
-[![CodeQL](https://img.shields.io/badge/CodeQL-0%20open-brightgreen?style=flat-square)]()
+[![Tests](https://img.shields.io/badge/tests-3906-brightgreen?style=flat-square)]()
+[![CodeQL](https://img.shields.io/badge/CodeQL-0%20open%20%C2%B7%2047%20risk%20accepted-yellow?style=flat-square)]()
 [![TypeScript](https://img.shields.io/badge/tsc-0%20errors-brightgreen?style=flat-square)]()
 
 > Claude Code 的纯净分叉 —— 去遥测、去企业全家桶、保留核心能力。**已抵达 source-map 还原的上限。**
@@ -182,10 +182,10 @@ tail -f ~/.claude/local_analytics.jsonl
 | 指标 | CCB 基线 | CC Pure 当前 | 提升 |
 |------|:--------:|:----------:|:----:|
 | tsc 错误 | 62 | **0** | 反编译残留+类型裂缝全清零 |
-| 测试通过 | 3007 | **3919** | +912 |
+| 测试通过 | 3007 | **3906** | +899 |
 | 构建 | 不稳定 | **稳定（splitting: true）** | ✅ |
 | 遥测外连 | 有 | **0** | ✅ |
-| CodeQL open | 175+ | **0**（全量处置） | 254 fixed + 260 dismissed，零遗留 |
+| CodeQL open | 175+ | **0** | 254 fixed · 260 dismissed（含 47 high 在单用户威胁模型下风险接受，非修复） |
 | as any (核心) | 94 | **0** | ✅ |
 
 ### 🔧 Zod v4 类型裂缝修复（方案 C）
@@ -220,13 +220,13 @@ export function asMCPSchema<T extends $ZodType>(
 | 5 | security-and-quality | 83→39：44 修/dismiss（含 3 处功能退化 revert + stripHtml 加固） |
 | 6 | 架构债清算 | 47→0：11 medium dismiss + 36 high dismiss（见下方「还原上限」） |
 
-**最终处置**: 254 fixed · 260 dismissed · **0 open**。详见 [docs/codeql-dismissed-high-alerts.md](docs/codeql-dismissed-high-alerts.md)。
+**最终处置**: 254 fixed · 260 dismissed · **0 open**（47 high 在单用户威胁模型下风险接受，非修复）。详见 [docs/codeql-dismissed-high-alerts.md](docs/codeql-dismissed-high-alerts.md)。
 
 ---
 
 ### 🧱 反编译的还原上限
 
-在 source-map 重建的范式下，系统性的代码质量改进已触及天花板。**tsc 零错误、CodeQL 零遗留、构建稳定、测试全绿。** 后续专注上游更新合并，Claude Code 的还原就此告一段落。
+在 source-map 重建的范式下，系统性的代码质量改进已触及天花板。**tsc 零错误、CodeQL 零遗留（47 high 风险接受）、构建稳定、测试全绿。** 后续专注上游更新合并，Claude Code 的还原就此告一段落。
 
 ---
 
@@ -236,7 +236,7 @@ export function asMCPSchema<T extends $ZodType>(
 bun install
 bun run dev           # 开发模式（默认全 feature 开启）
 bun run build         # 生产构建
-bun test              # 3919 tests
+bun test              # 3906 tests
 ```
 
 ---
