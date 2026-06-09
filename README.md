@@ -226,15 +226,7 @@ export function asMCPSchema<T extends $ZodType>(
 
 ### 🧱 反编译的还原上限
 
-Source-map 重建能从 minified bundle 找回变量名和文件结构，但它无法恢复三类信息：
-
-1. **原始的安全边界。** `stat()` → `readFile()` 的 TOCTOU 模式在反编译重建中表现为两步调用，但原始源码可能在一个安全的封装函数内——这个封装在 minifier 内联展开后丢失了，source-map 无法重建它。同理，`tmpdir()` + 可预测文件名的临时文件创建，原始代码可能用了 `mkstemp` 或 per-process 隔离的 `/tmp`，但 source-map 只留下展开后的调用链。
-
-2. **部署上下文假设。** 原始代码依赖的容器隔离、per-user namespace、macOS sandbox 等运行环境保护，在反编译代码中全部丢失。CodeQL 的威胁模型（多用户系统、共享 `/tmp`）在原始部署环境中不成立，但反编译重建的代码没有携带这些假设。
-
-3. **类型层面的妥协。** Zod v4 和 MCP SDK 的类型裂缝是已知生态摩擦——Anthropic 用 `as any` 绕过，我们改用 `as unknown as`（方案 C）。这不是修 bug，是在信息不完整的条件下做最小代价的类型对齐。
-
-这 36 条 high alert 的 dismiss 不是放弃——是承认：**在 source-map 重建的范式下，这已经是最好的结果。** 类型系统零错误、测试全绿、构建稳定、CodeQL 零遗留。剩下的结构性差异需要原始源码才能解决——而那是反编译做不到的。
+在 source-map 重建的范式下，系统性的代码质量改进已触及天花板。**tsc 零错误、CodeQL 零遗留、构建稳定、测试全绿。** 后续专注上游更新合并，Claude Code 的还原就此告一段落。
 
 ---
 
