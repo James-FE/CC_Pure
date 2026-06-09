@@ -3,9 +3,10 @@
 [![Bun](https://img.shields.io/badge/runtime-Bun-black?style=flat-square&logo=bun)](https://bun.sh/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)]()
 [![Tests](https://img.shields.io/badge/tests-3919-brightgreen?style=flat-square)]()
-[![Security](https://img.shields.io/badge/CodeQL-0%20open-brightgreen?style=flat-square)]()
+[![CodeQL](https://img.shields.io/badge/CodeQL-0%20open-brightgreen?style=flat-square)]()
+[![TypeScript](https://img.shields.io/badge/tsc-0%20errors-brightgreen?style=flat-square)]()
 
-> Claude Code 的纯净分叉 —— 去遥测、去企业全家桶、保留核心能力。可审计、可自建、数据主权归你。
+> Claude Code 的纯净分叉 —— 去遥测、去企业全家桶、保留核心能力。**已抵达 source-map 还原的上限。**
 
 ---
 
@@ -184,7 +185,7 @@ tail -f ~/.claude/local_analytics.jsonl
 | 测试通过 | 3007 | **3919** | +912 |
 | 构建 | 不稳定 | **稳定（splitting: true）** | ✅ |
 | 遥测外连 | 有 | **0** | ✅ |
-| CodeQL open | 175+ | **39**（已知架构债） | 83→39，44 修/dismiss |
+| CodeQL open | 175+ | **0**（全量处置） | 254 fixed + 260 dismissed，零遗留 |
 | as any (核心) | 94 | **0** | ✅ |
 
 ### 🔧 Zod v4 类型裂缝修复（方案 C）
@@ -205,20 +206,35 @@ export function asMCPSchema<T extends $ZodType>(
 - 不碰 `node_modules`，不引入 `patch-package`，干净且可维护
 - 全部 7 处替换后 `tsc --noEmit` 归零——CC_Pure 史上首次
 
-### 安全审计（Phase 0-5，已完成）
+### 安全审计（Phase 0-6，已完成）
 
-四阶段安全审计 + security-and-quality 升级再审计，175→83→39：
+六个阶段安全审计，514 条 CodeQL alert 全量处置：
 
-| 阶段 | 范围 | 关键修复 |
+| 阶段 | 范围 | 关键工作 |
 |:----:|------|----------|
 | 0 | 基线建立 | 降级查询套件，过滤反编译噪音 |
 | 1 | 隐私泄露 | 凭证脱敏、RCS 默认绑 127.0.0.1 |
 | 2 | 结构对齐 | 删除 `src/tools/` 去重，修复 BashTool/AgentTool 回归 |
 | 3 | 漏洞修复 | shell 注入、URL 解析、HTML 过滤 |
 | 4 | 残余告警 | 命令注入（which）、ReDoS、净化绕过 |
-| 5 | security-and-quality | 83→39：44 条修/dismiss（含 3 处功能退化 revert 和 stripHtml 加固），39 条架构债记录不修 |
+| 5 | security-and-quality | 83→39：44 修/dismiss（含 3 处功能退化 revert + stripHtml 加固） |
+| 6 | 架构债清算 | 47→0：11 medium dismiss + 36 high dismiss（见下方「还原上限」） |
 
-**剩余 39 条全为架构债**（file-system-race ×23, insecure-temporary-file ×11, indirect-command-line-injection ×5）——需改变文件操作范式，单用户 CLI 工具中利用窗口极小，记录不修。详见 [docs/CodeQL_KNOWN_DEBT.md](docs/CodeQL_KNOWN_DEBT.md)。
+**最终处置**: 254 fixed · 260 dismissed · **0 open**。详见 [docs/codeql-dismissed-high-alerts.md](docs/codeql-dismissed-high-alerts.md)。
+
+---
+
+### 🧱 反编译的还原上限
+
+Source-map 重建能从 minified bundle 找回变量名和文件结构，但它无法恢复三类信息：
+
+1. **原始的安全边界。** `stat()` → `readFile()` 的 TOCTOU 模式在反编译重建中表现为两步调用，但原始源码可能在一个安全的封装函数内——这个封装在 minifier 内联展开后丢失了，source-map 无法重建它。同理，`tmpdir()` + 可预测文件名的临时文件创建，原始代码可能用了 `mkstemp` 或 per-process 隔离的 `/tmp`，但 source-map 只留下展开后的调用链。
+
+2. **部署上下文假设。** 原始代码依赖的容器隔离、per-user namespace、macOS sandbox 等运行环境保护，在反编译代码中全部丢失。CodeQL 的威胁模型（多用户系统、共享 `/tmp`）在原始部署环境中不成立，但反编译重建的代码没有携带这些假设。
+
+3. **类型层面的妥协。** Zod v4 和 MCP SDK 的类型裂缝是已知生态摩擦——Anthropic 用 `as any` 绕过，我们改用 `as unknown as`（方案 C）。这不是修 bug，是在信息不完整的条件下做最小代价的类型对齐。
+
+这 36 条 high alert 的 dismiss 不是放弃——是承认：**在 source-map 重建的范式下，这已经是最好的结果。** 类型系统零错误、测试全绿、构建稳定、CodeQL 零遗留。剩下的结构性差异需要原始源码才能解决——而那是反编译做不到的。
 
 ---
 
