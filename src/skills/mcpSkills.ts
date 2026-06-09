@@ -18,6 +18,7 @@ import { logMCPError } from '../utils/log.js'
 import { memoizeWithLRU } from '../utils/memoize.js'
 import { recursivelySanitizeUnicode } from '../utils/sanitization.js'
 import { getMCPSkillBuilders } from './mcpSkillBuilders.js'
+import { adaptMcpToolsToSkills } from './mcpSkillAdapter.js'
 import type {
   ContextRequirement,
   MCPSkill,
@@ -300,7 +301,10 @@ export const fetchMcpSkillsForClient = memoizeWithLRU(
         ListToolsResultSchema,
       )) as ListToolsResult
 
-      const toolsToProcess = recursivelySanitizeUnicode(result.tools)
+      const toolsToProcess = adaptMcpToolsToSkills(
+        recursivelySanitizeUnicode(result.tools),
+        { serverName: client.name },
+      )
       const availableToolNames = new Set(toolsToProcess.map(tool => tool.name))
       const availableQualifiedToolNames = new Set(
         toolsToProcess.map(tool => buildMcpToolName(client.name, tool.name)),
