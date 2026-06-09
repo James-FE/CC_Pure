@@ -1346,6 +1346,28 @@ async function* queryModel(
   // OpenAI-compatible provider: delegate to the OpenAI adapter layer
   // after shared preprocessing (message normalization, tool filtering,
   // media stripping) but before Anthropic-specific logic (betas, thinking, caching).
+
+  // Compute deferred tool list once for reuse in system prompt + reminders.
+  // Must run BEFORE provider split so both Anthropic and OpenAI paths see it.
+  let deferredToolListContent = ''
+  if (useSearchExtraTools && !isDeferredToolsDeltaEnabled()) {
+    const deferredToolList = tools
+      .filter(t => deferredToolNames.has(t.name))
+      .map(formatDeferredToolLine)
+      .sort()
+      .join('\n')
+    if (deferredToolList) {
+      deferredToolListContent = `<available-deferred-tools>\n${deferredToolList}\n</available-deferred-tools>`
+    }
+  }
+
+  // When MCP is stable (!hasPendingMcpServers), inject deferred list into
+  // systemPrompt prefix so it lives inside the cache breakpoint. When pending,
+  // the list is dynamic — handled per-path via reminders below.
+  if (deferredToolListContent && !options.hasPendingMcpServers) {
+    systemPrompt = [...systemPrompt, deferredToolListContent]
+  }
+
   if (getAPIProvider() === 'openai') {
     const { queryModelOpenAI } = await import('./openai/index.js')
     // OpenAI emulates Anthropic's dynamic tool loading client-side. It needs
@@ -1383,23 +1405,10 @@ async function* queryModel(
   // so the fingerprint reflects the actual user input.
   const fingerprint = computeFingerprintFromMessages(messagesForAPI)
 
-  // Compute deferred tool list once for reuse in both system prompt and reminder paths
-  let deferredToolListContent = ''
-  if (useSearchExtraTools && !isDeferredToolsDeltaEnabled()) {
-    const deferredToolList = tools
-      .filter(t => deferredToolNames.has(t.name))
-      .map(formatDeferredToolLine)
-      .sort()
-      .join('\n')
-    if (deferredToolList) {
-      deferredToolListContent = `<available-deferred-tools>\n${deferredToolList}\n</available-deferred-tools>`
-    }
-  }
-
   // When MCP servers are still pending, tools may appear dynamically,
   // so append the list as a per-turn reminder (outside cache breakpoint).
-  // When stable (!hasPendingMcpServers), move the list into the system
-  // prompt prefix (inside cache) to save tokens across turns.
+  // When stable (!hasPendingMcpServers), the list is already in systemPrompt
+  // (injected before the provider split above).
   const shouldAppendDeferredListAsReminder =
     deferredToolListContent && options.hasPendingMcpServers
   if (shouldAppendDeferredListAsReminder) {
@@ -1424,14 +1433,6 @@ async function* queryModel(
   const injectChromeHere =
     useSearchExtraTools && hasChromeTools && !isMcpInstructionsDeltaEnabled()
 
-  // Inject deferred tool list into system prompt when MCP is stable.
-  // When !hasPendingMcpServers, the list is static across turns, so placing
-  // it in the system prompt prefix allows cache reuse (no per-turn reminder cost).
-  const deferredToolListForSystemPrompt =
-    deferredToolListContent && !options.hasPendingMcpServers
-      ? deferredToolListContent
-      : ''
-
   // filter(Boolean) works by converting each element to a boolean - empty strings become false and are filtered out.
   systemPrompt = asSystemPrompt(
     [
@@ -1441,9 +1442,6 @@ async function* queryModel(
         hasAppendSystemPrompt: options.hasAppendSystemPrompt,
       }),
       ...systemPrompt,
-      ...(deferredToolListForSystemPrompt
-        ? [deferredToolListForSystemPrompt]
-        : []),
       ...(advisorModel ? [ADVISOR_TOOL_INSTRUCTIONS] : []),
       ...(injectChromeHere ? [CHROME_SEARCH_EXTRA_TOOLS_INSTRUCTIONS] : []),
     ].filter(Boolean),

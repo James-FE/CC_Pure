@@ -64,8 +64,12 @@ function prependDeferredToolListIfNeeded(
   tools: Tools,
   deferredToolNames: Set<string>,
   useSearchExtraTools: boolean,
+  hasPendingMcpServers: boolean,
 ): (AssistantMessage | UserMessage)[] {
   if (!useSearchExtraTools || isDeferredToolsDeltaEnabled()) return messages
+  // When MCP is stable, deferred list already lives in system prompt prefix
+  // (injected before the provider split in claude.ts). No need to prepend.
+  if (!hasPendingMcpServers) return messages
 
   const deferredToolList = tools
     .filter(tool => deferredToolNames.has(tool.name))
@@ -241,6 +245,7 @@ export async function* queryModelOpenAI(
       tools,
       deferredToolNames,
       useSearchExtraTools,
+      options.hasPendingMcpServers,
     )
     const openaiMessages = anthropicMessagesToOpenAI(
       messagesWithDeferredToolList,
