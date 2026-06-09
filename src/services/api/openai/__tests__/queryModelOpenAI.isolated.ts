@@ -230,43 +230,14 @@ mock.module('../../../../utils/envUtils.js', () => ({
   getClaudeConfigHomeDir: () => '/tmp/.claude-test',
 }))
 
-mock.module('../../../../services/analytics/growthbook.js', () => ({
+mock.module('src/services/analytics/growthbook.js', () => ({
   getFeatureValue_CACHED_MAY_BE_STALE: (_key: string, fallback: unknown) =>
     fallback,
 }))
 
-const noop = () => {}
-// Proxy-based state mock: returns noop/Promise.resolve for any unknown export.
-// CC_Pure's import graph pulls in many state exports that upstream doesn't need.
-const stateMock = new Proxy(
-  {
-    isReplBridgeActive: () => false,
-    getSessionId: () => 'test-session',
-    getParentSessionId: () => undefined,
-    getCwdState: () => process.cwd(),
-    getOriginalCwd: () => process.cwd(),
-    getSessionProjectDir: () => null,
-    getProjectRoot: () => process.cwd(),
-    setCwdState: noop,
-    setOriginalCwd: noop,
-    setLastAPIRequestMessages: noop,
-    setLastAPIRequest: noop,
-    getIsNonInteractiveSession: () => false,
-    addSlowOperation: noop,
-    addToTotalDurationState: noop,
-    waitForScrollIdle: () => Promise.resolve(),
-  },
-  {
-    get(target, prop) {
-      if (prop in target) return (target as any)[prop]
-      // Any unknown export gets a noop function — prevents whack-a-mole
-      return (..._args: any[]) => {}
-    },
-    ownKeys(target) {
-      return Reflect.ownKeys(target)
-    },
-  },
-)
+const stateMock = {
+  isReplBridgeActive: () => false,
+}
 mock.module('src/bootstrap/state.js', () => stateMock)
 
 mock.module('bun:bundle', () => ({
@@ -365,10 +336,14 @@ mock.module('../../../../utils/searchExtraTools.js', () => ({
   isDeferredToolsDeltaEnabled: () => false,
 }))
 
-mock.module('../../../../tools/SearchExtraToolsTool/prompt.js', () => ({
-  isDeferredTool: () => false,
-  SEARCH_EXTRA_TOOLS_TOOL_NAME: '__tool_search__',
-}))
+mock.module(
+  '@claude-code-best/builtin-tools/tools/SearchExtraToolsTool/prompt.js',
+  () => ({
+    isDeferredTool: (t: any) => t.isMcp === true,
+    formatDeferredToolLine: (t: any) => t.name,
+    SEARCH_EXTRA_TOOLS_TOOL_NAME: '__tool_search__',
+  }),
+)
 
 mock.module('../../../../cost-tracker.js', () => ({
   addToTotalSessionCost: () => {},
@@ -674,6 +649,7 @@ describe('queryModelOpenAI — deferred MCP tool visibility', () => {
         tools: [],
         agents: [],
         querySource: 'main_loop',
+        hasPendingMcpServers: true,
         getToolPermissionContext: async () => ({
           alwaysAllow: [],
           alwaysDeny: [],
