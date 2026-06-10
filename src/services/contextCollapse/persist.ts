@@ -1,12 +1,31 @@
 import type { CollapseEntry } from './operations.js'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
 /**
- * Validates that an object looks like a CollapseEntry.
+ * Validates that an object has the required persisted CollapseEntry shape.
  */
 export function isValidEntry(entry: unknown): entry is CollapseEntry {
-  if (!entry || typeof entry !== 'object') return false
-  const obj = entry as Record<string, unknown>
-  return typeof obj.id === 'string' && obj.id.trim() !== ''
+  if (!isRecord(entry)) return false
+
+  const span = entry.span
+  const replacement = entry.replacement
+
+  return (
+    typeof entry.id === 'string' &&
+    entry.id.trim() !== '' &&
+    isRecord(span) &&
+    typeof span.startIdx === 'number' &&
+    typeof span.endIdx === 'number' &&
+    isRecord(replacement) &&
+    typeof replacement.text === 'string' &&
+    typeof replacement.tokens === 'number' &&
+    typeof entry.createdAt === 'string' &&
+    entry.createdAt.trim() !== '' &&
+    isRecord(entry.meta)
+  )
 }
 
 /**

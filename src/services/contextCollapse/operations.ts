@@ -67,6 +67,36 @@ export function createSummaryMessage(entry: CollapseEntry): Message {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isProjectableEntry(
+  entry: unknown,
+  messageCount: number,
+): entry is CollapseEntry {
+  if (!isRecord(entry)) return false
+
+  const span = entry.span
+  const replacement = entry.replacement
+
+  if (!isRecord(span) || !isRecord(replacement) || !isRecord(entry.meta)) {
+    return false
+  }
+
+  return (
+    typeof span.startIdx === 'number' &&
+    typeof span.endIdx === 'number' &&
+    span.startIdx >= 0 &&
+    span.endIdx < messageCount &&
+    span.startIdx <= span.endIdx &&
+    typeof replacement.text === 'string' &&
+    typeof replacement.tokens === 'number' &&
+    typeof entry.createdAt === 'string' &&
+    entry.createdAt.trim() !== ''
+  )
+}
+
 /**
  * Projects messages through a collapse commit log, returning a filtered
  * view where collapsed spans are replaced by summary messages.
@@ -74,6 +104,10 @@ export function createSummaryMessage(entry: CollapseEntry): Message {
  * The collapse log is replayed on every entry so collapses persist across
  * turns — the full history lives in the REPL array, but the projected view
  * is what gets sent to the model.
+ *
+ * Invalid or out-of-range entries are ignored so corrupted persisted data
+ * cannot throw while rebuilding the view. Overlapping valid spans are allowed;
+ * duplicate skipped indices are naturally deduped by the skip set.
  *
  * @param messages  Full message history
  * @param collapseLog  Chronological list of collapse entries (optional — reads
@@ -87,9 +121,9 @@ export function projectView(
   if (!collapseLog || collapseLog.length === 0) return messages
 
   // Sort by startIdx ascending so later collapses don't break earlier indices
-  const sorted = [...collapseLog].sort(
-    (a, b) => a.span.startIdx - b.span.startIdx,
-  )
+  const sorted = collapseLog
+    .filter(entry => isProjectableEntry(entry, messages.length))
+    .sort((a, b) => a.span.startIdx - b.span.startIdx)
 
   // Build a set of indices to skip
   const skipIndices = new Set<number>()

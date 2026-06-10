@@ -73,6 +73,23 @@ describe('projectView', () => {
       '[Collapsed 2 messages]\n\nlater summary',
     )
   })
+
+  test('skips collapse entries with spans outside the message range', () => {
+    const messages = ['m0', 'm1', 'm2'].map(makeMessage)
+
+    const projected = projectView(messages, [
+      makeEntry('negative-start', -1, 1, 'negative summary'),
+      makeEntry('past-end', 2, 3, 'past end summary'),
+      makeEntry('valid', 1, 1, 'valid summary'),
+    ])
+
+    expect(projected).toHaveLength(3)
+    expect(projected[0]).toBe(messages[0])
+    expect(projected[1]?.message?.content).toBe(
+      '[Collapsed 1 messages]\n\nvalid summary',
+    )
+    expect(projected[2]).toBe(messages[2])
+  })
 })
 
 describe('createSummaryMessage', () => {
