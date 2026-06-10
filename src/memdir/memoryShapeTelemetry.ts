@@ -21,8 +21,10 @@
  * CC_Pure:
  *   The original implementation was not included in the leaked source.
  *   Function signatures were reconstructed from the dynamic require() calls
- *   in the callers. Implementation is no-op — we do not send telemetry to
- *   Anthropic and the MEMORY_SHAPE_TELEMETRY feature flag is left disabled.
+ *   in the callers. Instead of sending telemetry to Anthropic, we log
+ *   memory shape data locally to ~/.claude/memory-stats.jsonl so the user
+ *   can inspect recall precision, pool size distribution, and per-tool
+ *   write patterns without any external analytics dependency.
  *
  * Restoration notes:
  *   The data is rich (recall pool size, selection set, per-tool write stats,
@@ -30,19 +32,62 @@
  *   replace the no-ops with structured logging to ~/.claude/memory-stats.jsonl.
  *   The MemoryHeader and MemoryScope types are real and available at the
  *   call sites — no additional data plumbing needed.
+ *
+ *   To inspect: `cat ~/.claude/memory-stats.jsonl | jq .` or
+ *   `tail -f ~/.claude/memory-stats.jsonl` during a session.
  */
 
+import fs from 'node:fs'
+import os from 'node:os'
 import type { MemoryHeader } from './memoryScan.js'
 import type { MemoryScope } from '../utils/memoryFileDetection.js'
+
+const LOG_PATH = `${os.homedir()}/.claude/memory-stats.jsonl`
+
+function typeCounts(memories: MemoryHeader[]): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const m of memories) {
+    const type = m.type ?? 'undefined'
+    counts[type] = (counts[type] ?? 0) + 1
+  }
+  return counts
+}
 
 export const logMemoryRecallShape: (
   memories: MemoryHeader[],
   selected: MemoryHeader[],
-) => void = () => {}
+) => void = (memories, selected) => {
+  try {
+    const line = JSON.stringify({
+      ts: new Date().toISOString(),
+      event: 'memory_recall_shape',
+      poolSize: memories.length,
+      selectedCount: selected.length,
+      poolTypeCounts: typeCounts(memories),
+      selectedTypeCounts: typeCounts(selected),
+    })
+    fs.appendFileSync(LOG_PATH, line + '\n')
+  } catch {
+    // Silently ignore — logging must never throw
+  }
+}
 
 export const logMemoryWriteShape: (
   toolName: string,
   toolInput: Record<string, unknown>,
   filePath: string,
   scope: MemoryScope,
-) => void = () => {}
+) => void = (toolName, _toolInput, filePath, scope) => {
+  try {
+    const line = JSON.stringify({
+      ts: new Date().toISOString(),
+      event: 'memory_write_shape',
+      toolName,
+      scope,
+      filePath,
+    })
+    fs.appendFileSync(LOG_PATH, line + '\n')
+  } catch {
+    // Silently ignore — logging must never throw
+  }
+}
