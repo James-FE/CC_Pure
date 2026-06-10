@@ -83,7 +83,7 @@
 |:---|---:|
 | Sentry | ❌ 移除 |
 | Pipe IPC / LAN Pipes | ❌ 禁用 |
-| UDS_INBOX | ❌ 禁用 |
+| UDS_INBOX | ✅ 已恢复 |
 | Anthropic 遥测 | ❌ 阻断（本地 JSONL sink 接管） |
 | 社区 Gemini 实现 | ❌ 删除（保留 @ant 原版） |
 

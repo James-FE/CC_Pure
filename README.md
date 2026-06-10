@@ -101,7 +101,7 @@ CC Pure 基于 CCB v2.6.11 反编译源码，做了以下核心变更：
 |------|:---:|------|
 | Sentry 错误追踪 | ❌ 移除 | 数据上报第三方，CCP 无此集成 |
 | Pipe IPC / LAN Pipes | ❌ 禁用 | 多机编排，个人使用不需要 |
-| UDS_INBOX | ❌ 禁用 | 进程间通信管道，Node.js 环境卡死 |
+| UDS_INBOX | ✅ 已恢复 | 进程间通信管道，peers 命令 + UDS 消息已实现 |
 | Anthropic 遥测上报 | ❌ 阻断 | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` 启动层拦截 |
 | Langfuse 监控 | 🟡 休眠 | 代码保留（`src/services/langfuse/`），配 key 即激活，支持 Docker 自部署 |
 | GrowthBook 远程配置 | 🟡 本地降级 | 1256 行完整客户端，远程不可用时自动使用本地静态默认值 |
