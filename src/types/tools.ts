@@ -157,7 +157,14 @@ export type WebSearchProgress = {
  * SDK workflow progress item — emitted in task_progress events.
  * Shape depends on the workflow engine producing the progress.
  */
-export type SdkWorkflowProgress = Record<string, unknown>
+export type SdkWorkflowProgress = {
+  type: string
+  index: number
+  phaseIndex: number
+  label?: string
+  status?: 'pending' | 'in_progress' | 'completed' | 'failed'
+  detail?: string
+}
 
 /**
  * Union of all tool progress types — the canonical Progress type used by Tool.ts.
