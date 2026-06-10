@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import type { Message } from 'src/types/message.js'
 
 /**
@@ -83,7 +84,7 @@ export function createSnipBoundary(opts: {
   const now = new Date().toISOString()
   return {
     type: 'user',
-    uuid: `snip-boundary-${Date.now()}` as Message['uuid'],
+    uuid: randomUUID(),
     message: {
       role: 'user',
       content: `[Earlier conversation snipped — ${opts.messageCount} messages removed]`,
@@ -91,8 +92,6 @@ export function createSnipBoundary(opts: {
     timestamp: now,
     isSidechain: true,
     isEphemeral: true,
-    transcript: '',
-    sessionId: 0,
     snipBoundary: {
       role: 'boundary',
       snippedAt: now,

@@ -79,14 +79,27 @@ export type MCPProgress = {
 
 /**
  * Progress data for REPL tool execution.
- * Follows the Bash-like streaming output pattern.
+ * Fires while code executes in a persistent REPL session.
  */
 export type REPLToolProgress = {
   type: 'repl_progress'
-  fullOutput?: string
-  output?: string
-  elapsedTimeSeconds?: number
-  totalLines?: number
+  /** REPL session identifier */
+  sessionId?: string
+  /** Incremental output chunk */
+  output?: {
+    /** Output stream */
+    stream: 'stdout' | 'stderr'
+    /** Output data */
+    data: string
+    /** Monotonic sequence number for ordering */
+    sequence: number
+  }
+  /** Current execution state */
+  state: 'executing' | 'awaiting_input' | 'completed' | 'error'
+  /** Elapsed time in milliseconds */
+  elapsedMs?: number
+  /** The code being executed (on first event) */
+  code?: string
 }
 
 /**
@@ -118,12 +131,26 @@ export type TaskOutputProgress = {
 
 /**
  * Progress data for WebSearch tool.
- * Reports search results and status.
+ * Fires incrementally as the search pipeline progresses.
  */
 export type WebSearchProgress = {
   type: 'web_search_progress'
-  fullOutput?: string
-  output?: string
+  /** The search query */
+  query?: string
+  /** Current pipeline stage */
+  stage: 'searching' | 'fetching' | 'parsing' | 'completed'
+  /** Search provider (e.g., 'google', 'bing') */
+  provider?: string
+  /** Total results found so far */
+  resultsFound?: number
+  /** Incremental results as they arrive */
+  partialResults?: Array<{
+    title: string
+    url: string
+    snippet?: string
+  }>
+  /** Elapsed time in milliseconds */
+  elapsedMs?: number
 }
 
 /**

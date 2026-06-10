@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import type { Message } from 'src/types/message.js'
 
 /**
@@ -49,11 +50,13 @@ export type CollapseEntry = {
 
 /**
  * Creates a summary message that represents a collapsed span.
+ * Uses a factory pattern with sensible defaults for synthetic messages
+ * so callers don't need `as unknown as Message` type bypasses.
  */
 function createSummaryMessage(entry: CollapseEntry): Message {
   return {
     type: 'user',
-    uuid: `collapse-${entry.id}` as Message['uuid'],
+    uuid: randomUUID(),
     message: {
       role: 'user',
       content: `[Collapsed ${entry.meta.messageCount} messages]\n\n${entry.replacement.text}`,
@@ -61,9 +64,7 @@ function createSummaryMessage(entry: CollapseEntry): Message {
     timestamp: entry.createdAt,
     isSidechain: true,
     isEphemeral: true,
-    transcript: '',
-    sessionId: 0,
-  } as unknown as Message
+  } as Message
 }
 
 /**

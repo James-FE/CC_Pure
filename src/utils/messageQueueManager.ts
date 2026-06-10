@@ -40,11 +40,13 @@ function logOperation(
   const afterDepth =
     operation === 'enqueue'
       ? depth + 1
-      : operation === 'dequeue' || operation === 'remove'
+      : operation === 'dequeue'
         ? depth - 1
         : operation === 'popAll'
-          ? 0
-          : depth
+          ? commandQueue.length // popAllEditable: some may remain
+          : operation === 'remove'
+            ? depth - 1
+            : depth
   const queueOp: QueueOperationMessage = {
     type: 'queue-operation',
     operation,
