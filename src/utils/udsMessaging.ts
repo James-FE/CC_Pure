@@ -3,17 +3,20 @@
  *
  * Each Claude Code instance creates a UDS socket for cross-session peer messaging.
  * Other instances discover peers by scanning for these sockets in a shared directory.
+ *
+ * Socket naming: claude-messaging-{hostname}-{pid}.sock
+ * Hostname included to avoid PID collisions across containers / PID namespaces.
  */
-import { tmpdir } from 'node:os'
+import { tmpdir, hostname } from 'node:os'
 import { join } from 'node:path'
 import { createServer } from 'node:net'
-import { existsSync, unlinkSync } from 'node:fs'
+import { existsSync, unlinkSync, chmodSync } from 'node:fs'
 
 let activeSocketPath: string | null = null
 
-/** Default UDS socket path for this process. */
+/** Default UDS socket path for this process — includes hostname to avoid PID namespace collisions. */
 export function getDefaultUdsSocketPath(): string {
-  return join(tmpdir(), `claude-messaging-${process.pid}.sock`)
+  return join(tmpdir(), `claude-messaging-${hostname()}-${process.pid}.sock`)
 }
 
 /** Get the currently active UDS messaging socket path, if any. */
@@ -28,7 +31,7 @@ export function formatUdsAddress(socketPath: string): string {
 
 /**
  * Start the UDS messaging server on the given socket path.
- * Listens for incoming peer messages and logs them.
+ * Registers exit handler to clean up the socket file on process termination.
  */
 export async function startUdsMessaging(
   socketPath: string,
@@ -47,8 +50,6 @@ export async function startUdsMessaging(
     const server = createServer(socket => {
       socket.on('data', () => {
         // Incoming peer message — handled by the inbox poller
-        // Raw data is consumed by useInboxPoller.ts which polls
-        // the socket independently via its own file-descriptor watch.
       })
       socket.on('error', () => {
         // Peer disconnect — silently ignore
@@ -56,18 +57,31 @@ export async function startUdsMessaging(
     })
 
     server.on('error', (err: NodeJS.ErrnoException) => {
-      // Socket in use by another instance — that's fine, they're our peer
-      if (err.code === 'EADDRINUSE') {
-        activeSocketPath = socketPath
-        resolve()
-        return
-      }
+      // EADDRINUSE means another instance already holds this socket.
+      // Do NOT claim success — we have no server listening. Reject so
+      // the caller knows the socket is unavailable.
       reject(err)
     })
 
     server.listen(socketPath, () => {
+      // Restrict to owner only — prevents other users from connecting
+      try {
+        chmodSync(socketPath, 0o600)
+      } catch {
+        /* best-effort */
+      }
+
       activeSocketPath = socketPath
-      resolve()
+
+      // Clean up socket file on normal exit
+      const cleanup = () => {
+        try {
+          unlinkSync(socketPath)
+        } catch {
+          /* already gone */
+        }
+      }
+      process.on('exit', cleanup)
     })
   })
 }

@@ -3,9 +3,11 @@
  *
  * Scans the temp directory for Claude Code messaging sockets and provides
  * functions to list live peers and send messages to them.
+ *
+ * Socket naming: claude-messaging-{hostname}-{pid}.sock
  */
 import { readdirSync, statSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { tmpdir, hostname } from 'node:os'
 import { join, basename } from 'node:path'
 import { createConnection } from 'node:net'
 
@@ -28,11 +30,22 @@ export interface LiveSession {
 const SOCKET_PREFIX = 'claude-messaging-'
 const SOCKET_SUFFIX = '.sock'
 
+/**
+ * Extract PID from a socket filename.
+ * Format: claude-messaging-{hostname}-{pid}.sock
+ * The hostname segment can contain hyphens, so we take the last
+ * dash-separated token before the .sock suffix as the PID.
+ */
 function extractPid(socketPath: string): number | null {
   const name = basename(socketPath)
-  if (!name.startsWith(SOCKET_PREFIX) || !name.endsWith(SOCKET_SUFFIX))
+  if (!name.startsWith(SOCKET_PREFIX) || !name.endsWith(SOCKET_SUFFIX)) {
     return null
-  const pidStr = name.slice(SOCKET_PREFIX.length, -SOCKET_SUFFIX.length)
+  }
+  const inner = name.slice(SOCKET_PREFIX.length, -SOCKET_SUFFIX.length)
+  // PID is the last dash-separated segment (hostname may contain dashes)
+  const lastDash = inner.lastIndexOf('-')
+  if (lastDash === -1) return null
+  const pidStr = inner.slice(lastDash + 1)
   const pid = parseInt(pidStr, 10)
   return isNaN(pid) ? null : pid
 }
@@ -41,6 +54,8 @@ function extractPid(socketPath: string): number | null {
 export async function listPeers(): Promise<PeerInfo[]> {
   const peers: PeerInfo[] = []
   const ownPid = process.pid
+  const ownHostname = hostname()
+  const ownUid = process.getuid?.() ?? -1
 
   let entries: string[]
   try {
@@ -50,16 +65,27 @@ export async function listPeers(): Promise<PeerInfo[]> {
   }
 
   for (const entry of entries) {
-    if (!entry.startsWith(SOCKET_PREFIX) || !entry.endsWith(SOCKET_SUFFIX))
+    if (!entry.startsWith(SOCKET_PREFIX) || !entry.endsWith(SOCKET_SUFFIX)) {
       continue
+    }
     const socketPath = join(tmpdir(), entry)
     const pid = extractPid(socketPath)
-    if (pid === null || pid === ownPid) continue
+    if (pid === null) continue
 
-    // Verify socket is live (file exists and is a socket)
+    // Skip self: same hostname AND same pid
+    if (
+      pid === ownPid &&
+      entry.startsWith(`claude-messaging-${ownHostname}-`)
+    ) {
+      continue
+    }
+
+    // Verify socket is live and owned by the same user
     try {
       const stat = statSync(socketPath)
       if (!stat.isSocket()) continue
+      // Ownership check: only trust sockets owned by the same uid
+      if (ownUid !== -1 && stat.uid !== ownUid) continue
     } catch {
       continue
     }
