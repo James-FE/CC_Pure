@@ -4,6 +4,7 @@ import type { Permutations } from 'src/types/utils.js'
 import { getSessionId } from '../bootstrap/state.js'
 import type { AppState } from '../state/AppState.js'
 import type {
+  QueueEventSource,
   QueueOperation,
   QueueOperationMessage,
 } from '../types/messageQueueTypes.js'
@@ -25,14 +26,35 @@ export type SetAppState = (f: (prev: AppState) => AppState) => void
 // Logging helper
 // ============================================================================
 
-function logOperation(operation: QueueOperation, content?: string): void {
+function logOperation(
+  operation: QueueOperation,
+  content?: string,
+  opts?: {
+    priority?: QueuePriority
+    source?: QueueEventSource
+    depth?: number
+  },
+): void {
   const sessionId = getSessionId()
+  const depth = opts?.depth ?? commandQueue.length
+  const afterDepth =
+    operation === 'enqueue'
+      ? depth + 1
+      : operation === 'dequeue' || operation === 'remove'
+        ? depth - 1
+        : operation === 'popAll'
+          ? 0
+          : depth
   const queueOp: QueueOperationMessage = {
     type: 'queue-operation',
     operation,
     timestamp: new Date().toISOString(),
     sessionId,
     ...(content !== undefined && { content }),
+    ...(opts?.priority && { priority: opts.priority }),
+    ...(opts?.source && { source: opts.source }),
+    depthBefore: depth,
+    depthAfter: Math.max(0, afterDepth),
   }
   void recordQueueOperation(queueOp)
 }
