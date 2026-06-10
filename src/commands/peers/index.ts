@@ -1,6 +1,12 @@
-// STUB: 待补全 — 见 docs/devlog/02-tsc-stubs.md
-// Peers command module — handles peer-related CLI subcommands.
-// Imported dynamically by src/commands.ts. Stub: empty default export.
+import type { Command } from '../../commands.js'
 
-const _default: Record<string, unknown> = {}
-export default _default
+const peers: Command = {
+  type: 'local-jsx',
+  name: 'peers',
+  description:
+    'List connected Claude Code peers (local UDS + Remote Control bridge)',
+  isEnabled: () => true,
+  load: () => import('./peers.js'),
+}
+
+export default peers
