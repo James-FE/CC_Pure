@@ -10,13 +10,11 @@ import { useCallback } from 'react'
 
 type StoreApi = { getState: () => any }
 type SetAppState = (updater: (prev: any) => any) => void
-type AddNotification = (opts: {
-  key: string
-  text: string
-  color: string
-  priority: string
-  timeoutMs: number
-}) => void
+type AddNotification = (opts: any) => void
+// CCP note: narrow type (key/text/color/priority/timeoutMs) widened to `any`
+// because CCP's notification system uses AddNotificationFn with different
+// property names than CCB's Priority enum. The hook doesn't inspect opts,
+// it just forwards them to the caller-provided addNotification function.
 
 type Deps = {
   store: StoreApi

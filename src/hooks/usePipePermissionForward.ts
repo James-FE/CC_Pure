@@ -13,8 +13,8 @@ import type { MessageType } from '../types/message.js'
 
 type Deps = {
   store: { getState: () => any }
-  tools: Tool<any, any>[]
-  setMessages: (action: React.SetStateAction<MessageType[]>) => void
+  tools: readonly Tool<any, any>[]
+  setMessages: (action: React.SetStateAction<any[]>) => void
   setToolUseConfirmQueue: (action: React.SetStateAction<any[]>) => void
   getToolUseContext: (...args: any[]) => ToolUseContext
   mainLoopModel: string

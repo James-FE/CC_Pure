@@ -331,6 +331,12 @@ import { isBgSession, updateSessionName, updateSessionActivity } from '../utils/
 import { isInProcessTeammateTask, type InProcessTeammateTaskState } from '../tasks/InProcessTeammateTask/types.js';
 import { restoreRemoteAgentTasks } from '../tasks/RemoteAgentTask/RemoteAgentTask.js';
 import { useInboxPoller } from '../hooks/useInboxPoller.js';
+import { useMasterMonitor } from '../hooks/useMasterMonitor.js';
+import { useSlaveNotifications } from '../hooks/useSlaveNotifications.js';
+import { usePipeIpc } from '../hooks/usePipeIpc.js';
+import { usePipePermissionForward } from '../hooks/usePipePermissionForward.js';
+import { usePipeMuteSync } from '../hooks/usePipeMuteSync.js';
+import { usePipeRouter } from '../hooks/usePipeRouter.js';
 import * as proactiveModuleValue from '../proactive/index.js';
 import { useProactive as useProactiveValue } from '../proactive/useProactive.js';
 import { useScheduledTasks as useScheduledTasksValue } from '../hooks/useScheduledTasks.js';
@@ -4801,6 +4807,14 @@ export function REPL({
   });
 
   useMailboxBridge({ isLoading, onSubmitMessage: handleIncomingPrompt });
+
+  // --- Pipe IPC lifecycle (UDS_INBOX) ---
+  useMasterMonitor();
+  useSlaveNotifications();
+  usePipePermissionForward({ store, tools, setMessages, setToolUseConfirmQueue, getToolUseContext, mainLoopModel });
+  usePipeMuteSync({ setToolUseConfirmQueue });
+  usePipeIpc({ store, handleIncomingPrompt });
+  const { routeToSelectedPipes } = usePipeRouter({ store, setAppState, addNotification });
 
   // Scheduled tasks from .claude/scheduled_tasks.json (CronCreate/Delete/List)
   if (feature('AGENT_TRIGGERS')) {
