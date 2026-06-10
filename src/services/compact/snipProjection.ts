@@ -1,20 +1,105 @@
-// STUB: 待补全 — 见 docs/devlog/02-tsc-stubs.md
-// Snip projection utilities — used by HISTORY_SNIP feature to compact
-// conversation history by snipping out old messages and replacing them
-// with boundary markers.
-// Dynamically require'd by Message.tsx and QueryEngine.ts.
-
 import type { Message } from 'src/types/message.js'
 
 /**
- * Returns true if the given message is a snip boundary marker.
- * Stub: always returns false.
+ * Fields attached to a snip boundary message — marks where old conversation
+ * history was truncated and records what was removed.
  */
-export const isSnipBoundaryMessage: (message: Message) => boolean = () => false
+export type SnipBoundary = {
+  /** Discriminator for type-guard detection */
+  role: 'boundary'
+  /** When the snip occurred (ISO-8601) */
+  snippedAt: string
+  /** How many messages were removed */
+  messageCount: number
+  /** Approximate token count of removed messages */
+  tokenCount?: number
+  /** Temporal bounds of the removed content */
+  dateRange: {
+    /** Earliest snipped message timestamp */
+    from: string
+    /** Latest snipped message timestamp */
+    to: string
+  }
+  /** Optional brief summary of removed content for context preservation */
+  summary?: string
+}
 
 /**
- * Projects messages through the snip view — returns a filtered/compressed
- * view of the message list. Stub implementation: identity (no-op).
+ * A message that marks a snip boundary in the conversation history.
+ * Extends the base Message type with SnipBoundary metadata.
  */
-export const projectSnippedView: (messages: Message[]) => Message[] =
-  messages => messages
+export type SnipBoundaryMessage = Message & { snipBoundary: SnipBoundary }
+
+/**
+ * Returns true if the given message is a snip boundary marker.
+ */
+export function isSnipBoundaryMessage(
+  message: Message,
+): message is SnipBoundaryMessage {
+  return (
+    'snipBoundary' in message &&
+    (message as SnipBoundaryMessage).snipBoundary?.role === 'boundary'
+  )
+}
+
+/**
+ * Projects messages through the snip view — returns only messages from
+ * the most recent snip boundary onward.
+ *
+ * REPL keeps snipped messages for UI scrollback; this projection ensures
+ * the model only receives content after the snip point.
+ *
+ * @param messages  Full message history (including snipped prefix)
+ * @returns  Messages from the last snip boundary to the end
+ */
+export function projectSnippedView(messages: Message[]): Message[] {
+  // Find the last snip boundary — there may be multiple if snipping
+  // happened more than once, but only the most recent matters.
+  let lastBoundaryIdx = -1
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (isSnipBoundaryMessage(messages[i]!)) {
+      lastBoundaryIdx = i
+      break
+    }
+  }
+
+  if (lastBoundaryIdx === -1) return messages
+
+  // Include the boundary message itself (it carries the snip metadata)
+  // plus everything after it.
+  return messages.slice(lastBoundaryIdx)
+}
+
+/**
+ * Creates a snip boundary message that can be inserted into the message
+ * list to mark where old history was truncated.
+ */
+export function createSnipBoundary(opts: {
+  messageCount: number
+  tokenCount?: number
+  dateRange: { from: string; to: string }
+  summary?: string
+}): SnipBoundaryMessage {
+  const now = new Date().toISOString()
+  return {
+    type: 'user',
+    uuid: `snip-boundary-${Date.now()}` as Message['uuid'],
+    message: {
+      role: 'user',
+      content: `[Earlier conversation snipped — ${opts.messageCount} messages removed]`,
+    },
+    timestamp: now,
+    isSidechain: true,
+    isEphemeral: true,
+    transcript: '',
+    sessionId: 0,
+    snipBoundary: {
+      role: 'boundary',
+      snippedAt: now,
+      messageCount: opts.messageCount,
+      tokenCount: opts.tokenCount,
+      dateRange: opts.dateRange,
+      summary: opts.summary,
+    },
+  } as SnipBoundaryMessage
+}
