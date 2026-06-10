@@ -1,12 +1,10 @@
 /**
  * usePipeIpc — Pipe IPC lifecycle hook.
  *
- * Extracted from REPL.tsx's 575-line inline useEffect. Manages:
- * 1. Server creation (UDS + optional TCP for LAN)
- * 2. LAN beacon startup
- * 3. Message handlers (ping, attach, prompt, permission, detach)
- * 4. Heartbeat loop (main: auto-attach + cleanup; sub: detect main alive)
- * 5. Cleanup on unmount
+ * Attaches REPL-owned behavior to process-wide pipe infrastructure:
+ * 1. Message handlers (ping, attach, prompt, permission, detach)
+ * 2. Heartbeat loop (main: auto-attach + cleanup; sub: detect main alive)
+ * 3. Cleanup of heartbeat/client relay state on unmount
  *
  * Feature-gated by UDS_INBOX. LAN extensions gated by LAN_PIPES.
  */
@@ -15,10 +13,9 @@ import { useEffect } from 'react'
 import * as pt from '../utils/pipeTransport.js'
 import * as pr from '../utils/pipeRegistry.js'
 import * as mm from './useMasterMonitor.js'
-import { getSessionId as _getSessionId } from '../bootstrap/state.js'
 import * as lb from '../utils/lanBeacon.js'
 import * as pp from '../utils/pipePermissionRelay.js'
-import * as osm from 'os'
+import { ensurePipeIpc } from '../utils/pipeBootstrap.js'
 import type {
   PipeMessage,
   PipeServer,
@@ -450,108 +447,42 @@ export function usePipeIpc({
   if (!feature('UDS_INBOX')) return
 
   useEffect(() => {
-    const sessionId = _getSessionId()
-    if (!sessionId) return
-    const pipeName = `cli-${sessionId.slice(0, 8)}`
     const disposed = { current: false }
     let heartbeatTimer: ReturnType<typeof setInterval> | null = null
     let heartbeatBusy = false
-    let pipeServer: PipeServer | null = null
 
     void (async () => {
       try {
-        // --- Phase 1: Role determination ---
-        const machId = await pr.getMachineId()
-        const mac = pr.getMacAddress()
-        const localIp = pt.getLocalIp()
-        const host = osm.hostname()
-        const roleResult = await pr.determineRole(machId)
-
-        const entry = {
-          id: pipeName,
-          pid: process.pid,
-          machineId: machId,
-          startedAt: Date.now(),
-          ip: localIp,
-          mac,
-          hostname: host,
-          pipeName,
-        }
-
-        let initialRole: 'main' | 'sub' = 'main'
-        let subIndex: number | null = null
-        let displayRole = 'main'
-
-        if (roleResult.role === 'main' || roleResult.role === 'main-recover') {
-          await pr.registerAsMain(entry)
-        } else {
-          subIndex = roleResult.subIndex
-          await pr.registerAsSub(entry, subIndex)
-          initialRole = 'sub'
-          displayRole = `sub-${subIndex}`
-        }
-
-        // --- Phase 2: Server creation ---
-        const server = await pt.createPipeServer(
-          pipeName,
-          feature('LAN_PIPES') ? { enableTcp: true, tcpPort: 0 } : undefined,
-        )
-        pipeServer = server
-        if (disposed.current) {
-          await server.close()
-          await pr.unregister(pipeName)
-          return
-        }
-
-        // --- Phase 3: LAN beacon ---
-        if (feature('LAN_PIPES') && server.tcpAddress) {
-          const beacon = new lb.LanBeacon({
-            pipeName,
-            machineId: machId,
-            hostname: host,
-            ip: localIp,
-            tcpPort: server.tcpAddress.port,
-            role: initialRole,
-          })
-          beacon.start()
-          lb.setLanBeacon(beacon)
-
-          const entryWithTcp = {
-            ...entry,
-            tcpPort: server.tcpAddress.port,
-            lanVisible: true,
-          }
-          if (initialRole === 'main') {
-            await pr.registerAsMain(entryWithTcp)
-          } else if (subIndex != null) {
-            await pr.registerAsSub(entryWithTcp, subIndex)
-          }
-        }
+        const boot = await ensurePipeIpc()
+        if (disposed.current || !boot) return
 
         // Update store
         store.setState((prev: any) => ({
           ...prev,
           pipeIpc: {
             ...pt.getPipeIpc(prev),
-            serverName: pipeName,
-            role: initialRole,
-            subIndex,
-            displayRole,
-            localIp,
-            hostname: host,
-            machineId: machId,
-            mac,
+            serverName: boot.pipeName,
+            role: boot.initialRole,
+            subIndex: boot.subIndex,
+            displayRole: boot.displayRole,
+            localIp: boot.localIp,
+            hostname: boot.hostname,
+            machineId: boot.machineId,
+            mac: boot.mac,
           },
         }))
 
         // --- Phase 4: Message handlers ---
-        registerMessageHandlers(
-          server,
-          pipeName,
-          machId,
-          store,
-          handleIncomingPrompt,
-        )
+        if (!boot.handlersAttached) {
+          boot.handlersAttached = true
+          registerMessageHandlers(
+            boot.server,
+            boot.pipeName,
+            boot.machineId,
+            store,
+            handleIncomingPrompt,
+          )
+        }
 
         // --- Phase 5: Heartbeat ---
         const HEARTBEAT_INTERVAL_MS = 5000
@@ -566,9 +497,15 @@ export function usePipeIpc({
             currentPipeState.role === 'main' ||
             currentPipeState.role === 'master'
           ) {
-            runMainHeartbeat(pipeName, machId, store, disposed)
+            runMainHeartbeat(boot.pipeName, boot.machineId, store, disposed)
           } else if (currentPipeState.role === 'sub') {
-            runSubHeartbeat(pipeName, machId, entry, store, disposed)
+            runSubHeartbeat(
+              boot.pipeName,
+              boot.machineId,
+              boot.entry,
+              store,
+              disposed,
+            )
           }
 
           // Reset busy flag after a short delay to allow the async work to settle
@@ -599,21 +536,6 @@ export function usePipeIpc({
         removeDeadSlave(name, store)
       }
 
-      // Stop LAN beacon
-      const beacon = lb.getLanBeacon()
-      if (beacon) {
-        try {
-          beacon.stop()
-        } catch {}
-        lb.setLanBeacon(null)
-      }
-
-      // Unregister + close server
-      pr.unregister(pipeName).catch(() => {})
-      if (pipeServer) {
-        void pipeServer.close().catch(() => {})
-        pipeServer = null
-      }
       pp.setPipeRelay(null)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
