@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "build": "tsc",
-    "dev": "ACP_RCS_URL=http://localhost:3000 ACP_RCS_TOKEN=test-my-key bun run src/cli/bin.ts ccb-bun -- --acp",
+    "dev": "ACP_RCS_URL=http://localhost:3000 ACP_RCS_TOKEN=test-my-key bun run src/cli/bin.ts ccp-bun -- --acp",
     "prepublishOnly": "bun run build"
   },
   "devDependencies": {

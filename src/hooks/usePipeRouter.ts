@@ -13,7 +13,7 @@ type SetAppState = (updater: (prev: any) => any) => void
 type AddNotification = (opts: any) => void
 // CCP note: narrow type (key/text/color/priority/timeoutMs) widened to `any`
 // because CCP's notification system uses AddNotificationFn with different
-// property names than CCB's Priority enum. The hook doesn't inspect opts,
+// property names than upstream's Priority enum. The hook doesn't inspect opts,
 // it just forwards them to the caller-provided addNotification function.
 
 type Deps = {

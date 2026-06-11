@@ -81,9 +81,9 @@ if (!rgScript.success) {
   console.log(`Bundled download-ripgrep script to ${outdir}/`)
 }
 
-// Step 6: Build no-split single-file bundle for `ccb` CLI
+// Step 6: Build no-split single-file bundle for CLI
 // Code-split build hangs on chunk lazy-loading with Bun 1.3.11,
-// so we provide a no-split alternative for the `ccb` launcher.
+// so we provide a no-split alternative for the CLI launcher.
 const noSplitDir = 'dist-nosplit'
 rmSync(noSplitDir, { recursive: true, force: true })
 const noSplitResult = await Bun.build({
