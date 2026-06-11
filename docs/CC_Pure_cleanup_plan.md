@@ -1,7 +1,7 @@
 # CC_Pure 遥测清理方案
 
 > 项目：claude-code-best (ccb) v2.1.888 → CC_Pure
-> 仓库：https://github.com/GhostDragon124/CC_Pure
+> 仓库：https://github.com/James-FE/CC_Pure
 > 审计报告：docs/telemetry-cleanup-audit.md
 
 ---

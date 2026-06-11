@@ -12,7 +12,7 @@ Only the `main` branch receives security updates. No release tags are maintained
 
 **Do NOT open a public issue.** Instead, report vulnerabilities privately:
 
-- GitHub: [Security Advisories](https://github.com/GhostDragon124/CC_Pure/security/advisories/new)
+- GitHub: [Security Advisories](https://github.com/James-FE/CC_Pure/security/advisories/new)
 - Expect acknowledgment within 72 hours and a status update within 7 days.
 
 ## Scope

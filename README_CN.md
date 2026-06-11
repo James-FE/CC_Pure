@@ -29,7 +29,7 @@ curl -fsSL https://bun.sh/install | bash
 ### 安装
 
 ```bash
-git clone https://github.com/GhostDragon124/CC_Pure.git
+git clone https://github.com/James-FE/CC_Pure.git
 cd CC_Pure
 bun install
 bun run build          # 构建到 dist/（split build, ~586 files）
@@ -200,6 +200,6 @@ TEAM_EVENT_SERVER_URL=http://machine-a:9742 bun run dev
 
 ## 致谢
 
-- [GhostDragon124](https://github.com/GhostDragon124) — 维护者
+- [James-FE](https://github.com/James-FE) — 维护者
 - [Claude Code Best](https://github.com/claude-code-best/claude-code) — 逆向工程与开源基础
 - [Anthropic](https://www.anthropic.com/) — Claude Code 原作者

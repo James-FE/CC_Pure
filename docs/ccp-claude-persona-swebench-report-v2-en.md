@@ -1,6 +1,6 @@
 # CCP Claude Persona Mode SWE-bench Lite Evaluation Report
 
-> **Author**: James Feng (GhostDragon124)
+> **Author**: James Feng (James-FE)
 > **Date**: 2025-06-08 (v2 revised 2025-06-10)
 > **Model**: DeepSeek V4 Pro (via OpenAI-compatible API)
 > **Tool**: CCP v2.6.11 + `--permission-mode bypassPermissions`
@@ -31,7 +31,7 @@ Claude's behavior differs significantly from other LLMs — it is more direct, m
 
 ### 2.2 Injection Content
 
-Core traits (full content at [agents/claude.md](https://github.com/GhostDragon124/CC_Pure/blob/main/agents/claude.md)):
+Core traits (full content at [agents/claude.md](https://github.com/James-FE/CC_Pure/blob/main/agents/claude.md)):
 
 1. **Intellectual curiosity** — Understand problems deeply rather than staying on the surface
 2. **Warm but not obsequious** — Genuinely helpful, not ingratiating
@@ -372,7 +372,7 @@ DeepSeek V4 Pro's key advantage is its ~97% KV cache hit rate: cache hit ¥0.025
 
 ---
 
-> **Repository**: https://github.com/GhostDragon124/CC_Pure
+> **Repository**: https://github.com/James-FE/CC_Pure
 > **Claude Persona Definition**: `agents/claude.md` (Markdown + YAML frontmatter unified format)
 > **CCP Internal Implementation**: `src/modes/personas/claude.ts` (reads `agents/*.md` and injects system prompt)
 > **Evaluation Data**: Contact the author for complete per-instance results

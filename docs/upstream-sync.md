@@ -140,7 +140,7 @@ acp 分支与 upstream/main 在 `src/` 下有 **316 个 commit** 的分叉差异
 | `4dcbaf1e` | fix: messageSelector require 崩溃 | ⏭️ CCP 已有同类修复 |
 | `b1c4f40f` | fix: ACP extended thinking 导致 400 | ⏭️ CCP 已有同类修复 |
 
-分支: [acp](https://github.com/GhostDragon124/CC_Pure/tree/acp) | 测试 3551 / build 586 files
+分支: [acp](https://github.com/James-FE/CC_Pure/tree/acp) | 测试 3551 / build 586 files
 
 ### 合并统计
 

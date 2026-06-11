@@ -29,7 +29,7 @@ curl -fsSL https://bun.sh/install | bash
 ### Install
 
 ```bash
-git clone https://github.com/GhostDragon124/CC_Pure.git
+git clone https://github.com/James-FE/CC_Pure.git
 cd CC_Pure
 bun install
 bun run build          # builds to dist/ (split build, ~586 files)
@@ -176,6 +176,6 @@ TEAM_EVENT_SERVER_URL=http://machine-a:9742 bun run dev
 
 ## Acknowledgements
 
-- [GhostDragon124](https://github.com/GhostDragon124) — Maintainer
+- [James-FE](https://github.com/James-FE) — Maintainer
 - [Claude Code Best](https://github.com/claude-code-best/claude-code) — Reverse engineering & open-source foundation
 - [Anthropic](https://www.anthropic.com/) — Original author of Claude Code
