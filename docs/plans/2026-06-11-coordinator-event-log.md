@@ -5,7 +5,7 @@
 > **Reviewer:** Hermes (code review + integration check)
 > **Estimated:** ~400 lines new code
 
-**Goal:** 在 CCP coordinator 上实现 event sourcing 的 compaction-resistant team state，Phase 1 聚焦本地单机
+**Goal:** Implement compaction-resistant team state via event sourcing on CCP coordinator. Phase 1: local single-machine
 
 ---
 
