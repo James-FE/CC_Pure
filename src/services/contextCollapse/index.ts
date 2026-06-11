@@ -13,6 +13,15 @@ interface CollapseStats {
   stagedSpans: number
 }
 
+let contextCollapseEnabled = false
+const subscribers = new Set<() => void>()
+
+function notifySubscribers(): void {
+  for (const callback of subscribers) {
+    callback()
+  }
+}
+
 export function getStats(): CollapseStats {
   return {
     totalMessages: 0,
@@ -30,18 +39,27 @@ export function getStats(): CollapseStats {
 }
 
 export function isContextCollapseEnabled(): boolean {
-  return false
+  return contextCollapseEnabled
 }
 
 export function subscribe(callback: () => void): () => void {
-  return () => {}
+  subscribers.add(callback)
+  return () => {
+    subscribers.delete(callback)
+  }
 }
 
-/** @stub */
-export function initContextCollapse(): void {}
+export function initContextCollapse(): void {
+  if (contextCollapseEnabled) return
+  contextCollapseEnabled = true
+  notifySubscribers()
+}
 
-/** @stub */
-export function resetContextCollapse(): void {}
+export function resetContextCollapse(): void {
+  if (!contextCollapseEnabled) return
+  contextCollapseEnabled = false
+  notifySubscribers()
+}
 
 /** @stub */
 export function applyCollapsesIfNeeded(..._args: unknown[]): {

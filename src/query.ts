@@ -11,6 +11,15 @@ import {
   type AutoCompactTrackingState,
 } from './services/compact/autoCompact.js'
 import { buildPostCompactMessages } from './services/compact/compact.js'
+import { isCoordinatorMode } from './coordinator/coordinatorMode.js'
+import {
+  getCoordinatorId,
+  getEventStore,
+} from './coordinator/eventStoreInstance.js'
+import {
+  projectTeamState,
+  renderTeamContext,
+} from './coordinator/teamProjection.js'
 import { feature } from 'bun:bundle'
 /* eslint-disable @typescript-eslint/no-require-imports */
 const reactiveCompact = feature('REACTIVE_COMPACT')
@@ -54,6 +63,7 @@ import {
   createToolUseSummaryMessage,
   createMicrocompactBoundaryMessage,
   stripSignatureBlocks,
+  getAssistantMessageText,
 } from './utils/messages.js'
 import { generateToolUseSummary } from './services/toolUseSummary/toolUseSummaryGenerator.js'
 import { prependUserContext, appendSystemContext } from './utils/api.js'
@@ -246,6 +256,109 @@ export type QueryParams = {
   deps?: QueryDeps
 }
 
+function recordCoordinatorAssistantEvents(
+  assistantMessages: readonly AssistantMessage[],
+  sessionId: string,
+): void {
+  if (!isCoordinatorMode()) {
+    return
+  }
+
+  const assistantText = assistantMessages
+    .map(message => getAssistantMessageText(message))
+    .filter((text): text is string => text !== null)
+    .join('\n')
+  if (!assistantText) {
+    return
+  }
+
+  const store = getEventStore()
+  const base = {
+    version: 1 as const,
+    timestamp: Date.now(),
+    coordinatorId: getCoordinatorId(),
+    sessionId,
+  }
+
+  const synthesisMatch = assistantText.match(
+    /<coordinator-synthesis>([\s\S]*?)<\/coordinator-synthesis>/,
+  )
+  if (synthesisMatch) {
+    void store
+      .append({
+        ...base,
+        type: 'coordinator.synthesis',
+        findings: synthesisMatch[1]!.trim().slice(0, 500),
+        decisions: '',
+      })
+      .catch(() => {})
+  }
+
+  for (const decisionMatch of assistantText.matchAll(
+    /<decision\b([^>]*)>([\s\S]*?)<\/decision>/g,
+  )) {
+    const attrs = decisionMatch[1] ?? ''
+    const action = extractDecisionAttribute(attrs, 'action') ?? 'unknown'
+    const workerId = extractDecisionAttribute(attrs, 'worker')
+    void store
+      .append({
+        ...base,
+        type: 'coordinator.decision',
+        action,
+        ...(workerId ? { workerId } : {}),
+        rationale: (decisionMatch[2] ?? '').trim().slice(0, 500),
+      })
+      .catch(() => {})
+  }
+}
+
+export async function writeCoordinatorCheckpoint(
+  teamContext: string | undefined,
+): Promise<number> {
+  void teamContext
+
+  const store = getEventStore()
+  const events = await store.read()
+  const timestamp = Date.now()
+  await store.append({
+    version: 1,
+    timestamp,
+    coordinatorId: getCoordinatorId(),
+    sessionId: getSessionId(),
+    type: 'coordinator.checkpoint',
+    projectedState: projectTeamState(events),
+  })
+  return timestamp
+}
+
+export async function clearEventsBeforeCheckpoint(
+  teamContext: string | undefined,
+): Promise<void> {
+  const timestamp = await writeCoordinatorCheckpoint(teamContext)
+  await getEventStore().clear(timestamp)
+}
+
+function extractDecisionAttribute(
+  attrs: string,
+  name: 'action' | 'worker',
+): string | undefined {
+  const match = attrs.match(new RegExp(`\\b${name}="([^"]*)"`))
+  return match?.[1]
+}
+
+async function buildCoordinatorTeamContext(): Promise<string | undefined> {
+  if (!isCoordinatorMode()) {
+    return undefined
+  }
+
+  const events = await getEventStore().read()
+  if (events.length === 0) {
+    return undefined
+  }
+
+  return renderTeamContext(projectTeamState(events))
+}
+
 // -- query loop state
 
 // Mutable state carried between loop iterations
@@ -339,6 +452,12 @@ export async function* query(
         terminal?.reason === 'aborted_streaming' ||
         terminal?.reason === 'aborted_tools'
       endTrace(langfuseTrace, undefined, isAborted ? 'interrupted' : undefined)
+    }
+
+    if (isCoordinatorMode()) {
+      void getEventStore()
+        .clear()
+        .catch(() => {})
     }
   }
 
@@ -639,7 +758,15 @@ async function* queryLoop(
         consecutiveFailures: 0,
       }
 
-      const postCompactMessages = buildPostCompactMessages(compactionResult)
+      const teamContext = await buildCoordinatorTeamContext()
+      const postCompactMessages = buildPostCompactMessages(
+        compactionResult,
+        teamContext,
+      )
+
+      if (isCoordinatorMode()) {
+        void clearEventsBeforeCheckpoint(teamContext).catch(() => {})
+      }
 
       for (const message of postCompactMessages) {
         yield message
@@ -1220,6 +1347,11 @@ async function* queryLoop(
       }
     }
 
+    recordCoordinatorAssistantEvents(
+      assistantMessages,
+      (toolUseContext as { sessionId?: string }).sessionId ?? 'unknown',
+    )
+
     if (!needsFollowUp) {
       const lastMessage = assistantMessages.at(-1)
 
@@ -1306,7 +1438,14 @@ async function* queryLoop(
             )
           }
 
-          const postCompactMessages = buildPostCompactMessages(compacted)
+          const teamContext = await buildCoordinatorTeamContext()
+          const postCompactMessages = buildPostCompactMessages(
+            compacted,
+            teamContext,
+          )
+          if (isCoordinatorMode()) {
+            void clearEventsBeforeCheckpoint(teamContext).catch(() => {})
+          }
           for (const msg of postCompactMessages) {
             yield msg
           }

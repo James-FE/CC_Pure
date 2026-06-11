@@ -1,1 +1,31 @@
+#!/bin/sh
+
+# Guard: prevent DELETION of GitHub workflow files (add/modify still allowed)
+# Codex/agents have a cleanup reflex that deletes these despite AGENTS.md warnings.
+# This is the mechanical guardrail that actually stops them.
+# NEW workflow files can be added (A), existing ones can be modified (M).
+MISSING_WORKFLOWS=$(git diff --cached --name-status | grep '^D' | grep '\.github/workflows/' || true)
+
+if [ -n "$MISSING_WORKFLOWS" ]; then
+  echo "⛔ BLOCKED: Deletion of GitHub workflow files detected:"
+  echo "$MISSING_WORKFLOWS"
+  echo ""
+  echo "These files are NEVER redundant — CI/CodeQL are project infrastructure."
+  echo "Bun auto-discovers tests, so CI never needs updating for new tests."
+  echo ""
+  echo "To proceed: restore the files with:"
+  echo "  git checkout HEAD -- .github/workflows/"
+  exit 1
+fi
+
+# Also check working tree (not just staged) for deletion
+WORKTREE_DELETED=$(git ls-files --deleted .github/workflows/ || true)
+if [ -n "$WORKTREE_DELETED" ]; then
+  echo "⛔ BLOCKED: Workflow files deleted from working tree:"
+  echo "$WORKTREE_DELETED"
+  echo ""
+  echo "Restore with: git checkout HEAD -- .github/workflows/"
+  exit 1
+fi
+
 npx lint-staged
