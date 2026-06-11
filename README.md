@@ -84,49 +84,67 @@ CC Pure is based on decompiled CCB v2.6.11 sources with these key changes:
 | **Voice** | VOICE_MODE | 🟡 Code complete, needs Anthropic OAuth |
 | **Scheduling** | KAIROS / KAIROS_BRIEF | 🟡 Code complete, needs GrowthBook + OAuth backend |
 
+### Telemetry: Source Preserved, Disabled by Default, Local Sink
+
+Source code (Datadog / GrowthBook / BigQuery / 1P Event Logging) is preserved. All upstream reporting blocked via `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`. A local JSONL sink at `logEvent()` captures 70+ events to `~/.claude/local_analytics.jsonl`.
+
+```bash
+python3 scripts/analyze_analytics.py   # today's event report
+tail -f ~/.claude/local_analytics.jsonl # real-time trace
+```
+
+→ [Claude Code's Light and Shadow: A Telemetry Deep-Dive](docs/Claude_Code_的光明和阴影面.md)
+
 ### Personality Modes (`soul-distilled`)
 
 `/mode` switches between 7 AI personalities — each with dedicated systemPrompt, UI theme, permissions, and response style:
 
-| Mode | Icon | Description |
-|------|:----:|-------------|
-| **Claude** | 🎭 | Authentic Claude persona — distilled from leaked 70KB Soul Document |
-| Default | ⚡ | Balanced, everyday development |
-| Gentle | 🌸 | Patient, educational |
-| Dr. Sharp | 🔍 | Rigorous 3-step code review |
-| Workhorse | 🐴 | Auto-execute, fewer confirmations |
-| Token Saver | 💰 | Minimal replies, save tokens |
-| Super AI | 🧠 | Deep thinking, comprehensive analysis |
+| Mode | Icon | Description | Persona |
+|------|:----:|-------------|:-------:|
+| **Claude** | 🎭 | Authentic Claude persona — distilled from leaked 70KB Soul Document | 2,848 chars |
+| Default | ⚡ | Balanced, everyday development | — |
+| Gentle | 🌸 | Patient, educational | 231 chars |
+| Dr. Sharp | 🔍 | Rigorous 3-step code review | 1,845 chars |
+| Workhorse | 🐴 | Auto-execute, fewer confirmations | 203 chars |
+| Token Saver | 💰 | Minimal replies, save tokens | 165 chars |
+| Super AI | 🧠 | Deep thinking, comprehensive analysis | 266 chars |
+
+```bash
+/mode               # interactive picker
+/mode claude        # switch directly to Claude persona
+/mode sharp         # switch to code review mode
+```
+
+**Custom modes:** Drop a YAML file in `~/.claude/modes/` — auto-loaded alongside built-ins.
+
+→ [CCP Claude Persona SWE-bench Lite Report (v2)](docs/ccp-claude-persona-swebench-report-v2.md) — cross-tool zero-migration. 90 instances: **+11pp** (68.6% vs 57.5%)
 
 ### Coordinator Event Log (`coordinator-sourced`)
 
-Event sourcing architecture for **compaction-resistant multi-agent communication**. When coordinator orchestrates multiple workers, every action is written as a typed event before the next LLM turn — compaction can't evict shared state because state lives in an append-only store outside the token window.
+Event sourcing for **compaction-resistant multi-agent communication**. Every coordinator action is written as a typed event before the next LLM turn — state lives outside the token window.
 
 ```
-coordinator action → write event → later: compaction → fold events → checkpoint → restore
+coordinator action → write event → compaction → fold events → checkpoint → restore
 ```
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| EventStore | `src/coordinator/teamEventStore.ts` | Interface: append / read / clear, 6 event types |
-| TeamProjection | `src/coordinator/teamProjection.ts` | Fold-based projection + checkpoint snapshot restore |
-| LocalFileEventStore | `src/coordinator/teamEventStore.ts` | Local JSONL storage under `.team-events/` |
-| RemoteEventStore | `src/coordinator/remoteEventStore.ts` | HTTP client for cross-machine (GET/POST/DELETE) |
-| HTTP Server | `src/coordinator/eventHttpServer.ts` | Bun.serve on port 9742, zero external deps |
+| EventStore | `src/coordinator/teamEventStore.ts` | append / read / clear, 6 event types |
+| TeamProjection | `src/coordinator/teamProjection.ts` | fold-based projection + checkpoint restore |
+| LocalFileEventStore | `src/coordinator/teamEventStore.ts` | local JSONL (`.team-events/`) |
+| RemoteEventStore | `src/coordinator/remoteEventStore.ts` | HTTP client, cross-machine |
+| HTTP Server | `src/coordinator/eventHttpServer.ts` | Bun.serve:9742, zero deps |
 
-**6 event types:** `session_started`, `worker_spawned`, `worker_result`, `synthesis`, `decision`, `checkpoint`
-
-**Cross-machine deployment:**
+**6 events:** `session_started` · `worker_spawned` · `worker_result` · `synthesis` · `decision` · `checkpoint`
 
 ```bash
-# Machine A: start event server
+# Machine A: serve events
 TEAM_EVENT_SERVER_PORT=9742 bun run src/coordinator/eventHttpServerEntry.ts
-
-# Machine B: read machine A's worker state remotely
+# Machine B: read remotely
 TEAM_EVENT_SERVER_URL=http://machine-a:9742 bun run dev
 ```
 
-→ Full design: [`Coordinator_Event_Log_Design_Doc.md`](docs/Coordinator_Event_Log_Design_Doc.md) (EN) · [`设计文档`](docs/Coordinator_Event_Log_设计文档.md) (中文) · [`Implementation plan`](docs/plans/2026-06-11-coordinator-event-log.md)
+→ Design: [`EN`](docs/Coordinator_Event_Log_Design_Doc.md) · [`中文`](docs/Coordinator_Event_Log_设计文档.md) · [`Plan`](docs/plans/2026-06-11-coordinator-event-log.md)
 
 ---
 

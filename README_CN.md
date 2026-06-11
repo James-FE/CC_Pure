@@ -49,7 +49,6 @@ bun run dev
 ### 配置本地快捷命令
 
 ```bash
-# 创建 ccp 命令
 cat > ~/.local/bin/ccp << 'EOF'
 #!/usr/bin/env bash
 export PATH="$HOME/.bun/bin:$PATH"
@@ -59,10 +58,6 @@ export NO_PROXY=localhost,127.0.0.1,.local
 exec bun /path/to/CC_Pure/dist-nosplit/cli.js "$@"
 EOF
 chmod +x ~/.local/bin/ccp
-
-# 使用
-ccp -p "hello world"    # pipe 模式
-ccp                     # 交互 REPL
 ```
 
 ### 验证
@@ -80,35 +75,34 @@ CC Pure 基于 CCB v2.6.11 反编译源码，做了以下核心变更：
 
 ### 上游同步策略
 
-持续追踪 [Claude Code Best](https://github.com/claude-code-best/claude-code) 上游更新，按安全优先原则选择性合并：
+持续追踪 [Claude Code Best](https://github.com/claude-code-best/claude-code) 上游更新：
 
 | 版本 | 日期 | 合并数 | 说明 |
 |------|------|:------:|------|
 | soul-distilled | 2026-06-08 | — | **🎭 人格觉醒**：上线模式系统，7 种 AI 人格即时切换 |
-| v2.6.11 | 2026-06-06 | 6 commits | **版本同步 2.6.5→2.6.11**：Vite 构建优化 (RSS 966MB→35MB)、ACP subagent 层级透传 |
-| type-wrought | 2026-06-08 | — | **🔧 类型系统完工**：Zod v4 + MCP SDK 类型裂缝修复，`tsc --noEmit` **0 错误** |
-| scars-mapped | 2026-06-09 | — | **🛡️ CodeQL 安全审计完工**：升级 security-and-quality，83→39，0 open |
+| v2.6.11 | 2026-06-06 | 6 commits | **版本同步**：Vite 构建优化 (RSS 966MB→35MB)、ACP subagent 层级透传 |
+| type-wrought | 2026-06-08 | — | **🔧 类型系统完工**：Zod v4 + MCP SDK 类型裂缝修复，`tsc` **0 错误** |
+| scars-mapped | 2026-06-09 | — | **🛡️ CodeQL 审计完工**：升级 security-and-quality，0 open |
 
-> **累计**：187 个候选 commit 全量审查 → ✅ 59 MERGE / 🟡 34 已存在 / ❌ 94 SKIP。
-> 详见 [`docs/upstream-sync.md`](docs/upstream-sync.md) — 958 行完整合并历史与审查清单。
+> **累计**：187 候选 commit 审查 → ✅ 59 MERGE / 🟡 34 已有 / ❌ 94 SKIP。详见 [`docs/upstream-sync.md`](docs/upstream-sync.md)
 
 ### 移除 / 降级的组件
 
 | 组件 | 状态 | 说明 |
 |------|:---:|------|
-| Sentry 错误追踪 | ❌ 移除 | 数据上报第三方 |
-| Pipe IPC / LAN Pipes | ✅ 已恢复 | 多机编排，UDS_INBOX + Coordinator 事件溯源完整实现 |
-| Coordinator Event Log | ✅ 已完成 | 事件溯源架构：append → projection → checkpoint → clear，HTTP 跨机读写 |
-| Anthropic 遥测上报 | ❌ 阻断 | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` 启动层拦截 |
-| Langfuse 监控 | 🟡 休眠 | 代码保留，配 key 即激活，支持 Docker 自部署 |
-| GrowthBook 远程配置 | 🟡 本地降级 | 1256 行完整客户端，远程不可用时自动使用本地静态默认值 |
+| Sentry | ❌ 移除 | 数据上报第三方 |
+| Pipe IPC / LAN Pipes | ✅ 已恢复 | UDS_INBOX + Coordinator 事件溯源 |
+| Coordinator Event Log | ✅ 已完成 | append → projection → checkpoint → clear，HTTP 跨机 |
+| Anthropic 遥测 | ❌ 阻断 | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` |
+| Langfuse | 🟡 休眠 | 代码保留，配 key 即激活 |
+| GrowthBook | 🟡 本地降级 | 1256 行客户端，自动 fallback |
 
 ### 遥测：保留源码，默认关闭，本地接管
 
-源码保留（Datadog / GrowthBook / BigQuery / 1P Event Logging），通过 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` 阻断所有上游上报。同时在 `logEvent()` 入口插入了本地 JSONL sink，70+ 事件全量写入 `~/.claude/local_analytics.jsonl`：
+Datadog / GrowthBook / BigQuery / 1P Event Logging 源码全保留。`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` 阻断所有上报。本地 JSONL sink 写入 `~/.claude/local_analytics.jsonl`：
 
 ```bash
-python3 scripts/analyze_analytics.py   # 查看今天的事件报告
+python3 scripts/analyze_analytics.py   # 今日报告
 tail -f ~/.claude/local_analytics.jsonl # 实时追踪
 ```
 
@@ -116,22 +110,21 @@ tail -f ~/.claude/local_analytics.jsonl # 实时追踪
 
 ### 保留的核心能力
 
-| 类别 | Feature | 状态 | 说明 |
-|------|---------|:---:|------|
-| **Agent 协议** | ACP | ✅ | 外部 Agent 协议，bridge / permissions / session |
-| **浏览器** | Chrome Use + Computer Use | ✅ | 浏览器扩展 + GUI 自动化 |
-| **远程控制** | BRIDGE_MODE + SSH_REMOTE | ✅ | React Web UI + WebSocket/SSE + SSH 远程 |
-| **自主代理** | PROACTIVE + DAEMON + COORDINATOR_MODE | ✅ | 多 worker 编排 + 事件溯源 |
-| **记忆系统** | EXTRACT_MEMORIES + LODESTONE + AWAY_SUMMARY | ✅ | 记忆整理 + 上下文锚点 |
-| **推理增强** | ULTRATHINK + ULTRAPLAN + VERIFICATION_AGENT | ✅ | 超深度思考 + 自动验证 |
-| **工具系统** | TOKEN_BUDGET + PROMPT_CACHE_BREAK_DETECTION | ✅ | Token 预算管理 |
+| 类别 | Feature | 状态 |
+|------|---------|:---:|
+| **Agent 协议** | ACP | ✅ |
+| **浏览器** | Chrome Use + Computer Use | ✅ |
+| **远程控制** | BRIDGE_MODE + SSH_REMOTE | ✅ |
+| **自主代理** | PROACTIVE + DAEMON + COORDINATOR_MODE | ✅ |
+| **记忆系统** | EXTRACT_MEMORIES + LODESTONE + AWAY_SUMMARY | ✅ |
+| **推理增强** | ULTRATHINK + ULTRAPLAN + VERIFICATION_AGENT | ✅ |
 
 ### 🎭 人格模式系统（soul-distilled）
 
-`/mode` 命令在 7 种 AI 人格间即时切换：
+`/mode` 在 7 种 AI 人格间即时切换：
 
-| 模式 | 图标 | 说明 | Persona 长度 |
-|------|:----:|------|:----------:|
+| 模式 | 图标 | 说明 | Persona |
+|------|:----:|------|:-------:|
 | **Claude** | 🎭 | 真品 Claude 人格 — 从泄露 70KB Soul Document 蒸馏 | 2,848 chars |
 | Default | ⚡ | 平衡模式，日常开发 | — |
 | Gentle | 🌸 | 耐心讲解，适合学习 | 231 chars |
@@ -142,39 +135,40 @@ tail -f ~/.claude/local_analytics.jsonl # 实时追踪
 
 ```bash
 /mode               # 交互式选择器
-/mode claude        # 直接切换到 Claude 人格
-/mode sharp         # 切换到代码审查模式
+/mode claude        # Claude 人格
+/mode sharp         # 代码审查模式
 ```
+
+**自定义模式：** `~/.claude/modes/` 下放 YAML → 自动加载。
+
+→ [CCP Claude Persona SWE-bench Lite 评测报告 (v2)](docs/ccp-claude-persona-swebench-report-v2.md) — 跨工具零迁移，90 实例：**+11pp**（68.6% vs 57.5%）
 
 ### Coordinator Event Log（事件溯源架构）
 
-事件溯源架构用于 **compaction 抗性的多 agent 通信**。coordinator 编排多个 worker 时，每次操作在下一个 LLM turn 之前即写入类型化事件——compaction 无法蒸发共享状态，因为状态存在于 token 窗口之外的 append-only 存储中。
+Compaction 抗性多 agent 通信。coordinator 每次操作即时写入类型化事件——状态在 token 窗口外。
 
 ```
-coordinator 操作 → 写事件 → compaction 时 → fold 事件 → checkpoint → 恢复
+coordinator 操作 → 写事件 → compaction → fold 事件 → checkpoint → 恢复
 ```
 
 | 组件 | 文件 | 说明 |
 |------|------|------|
-| EventStore | `src/coordinator/teamEventStore.ts` | 接口：append / read / clear，6 种事件 |
-| TeamProjection | `src/coordinator/teamProjection.ts` | Fold 投影 + checkpoint 快照恢复 |
-| LocalFileEventStore | `src/coordinator/teamEventStore.ts` | 本地 JSONL 存储（`.team-events/`） |
-| RemoteEventStore | `src/coordinator/remoteEventStore.ts` | HTTP 客户端，跨机读写 |
-| HTTP Server | `src/coordinator/eventHttpServer.ts` | Bun.serve 端口 9742，零外部依赖 |
+| EventStore | `src/coordinator/teamEventStore.ts` | append / read / clear，6 种事件 |
+| TeamProjection | `src/coordinator/teamProjection.ts` | Fold 投影 + checkpoint 恢复 |
+| LocalFileEventStore | `src/coordinator/teamEventStore.ts` | 本地 JSONL（`.team-events/`） |
+| RemoteEventStore | `src/coordinator/remoteEventStore.ts` | HTTP 客户端，跨机 |
+| HTTP Server | `src/coordinator/eventHttpServer.ts` | Bun.serve:9742，零依赖 |
 
-**6 种事件类型：** `session_started`、`worker_spawned`、`worker_result`、`synthesis`、`decision`、`checkpoint`
-
-**跨机部署：**
+**6 种事件：** `session_started` · `worker_spawned` · `worker_result` · `synthesis` · `decision` · `checkpoint`
 
 ```bash
 # 机器 A：启动事件服务器
 TEAM_EVENT_SERVER_PORT=9742 bun run src/coordinator/eventHttpServerEntry.ts
-
-# 机器 B：远程读取机器 A 的 worker 状态
+# 机器 B：远程读取
 TEAM_EVENT_SERVER_URL=http://machine-a:9742 bun run dev
 ```
 
-→ 完整设计：[`Coordinator_Event_Log_Design_Doc.md`](docs/Coordinator_Event_Log_Design_Doc.md) (EN) · [`设计文档`](docs/Coordinator_Event_Log_设计文档.md) (中文) · [`实施计划`](docs/plans/2026-06-11-coordinator-event-log.md)
+→ 设计：[`EN`](docs/Coordinator_Event_Log_Design_Doc.md) · [`中文`](docs/Coordinator_Event_Log_设计文档.md) · [`Plan`](docs/plans/2026-06-11-coordinator-event-log.md)
 
 ---
 
@@ -182,44 +176,26 @@ TEAM_EVENT_SERVER_URL=http://machine-a:9742 bun run dev
 
 | 指标 | CCB 基线 | CC Pure 当前 | 提升 |
 |------|:--------:|:----------:|:----:|
-| tsc 错误 | 62 | **0** | 反编译残留+类型裂缝全清零 |
+| tsc 错误 | 62 | **0** | 反编译残留全清零 |
 | 测试通过 | 3007 | **3968** | +961 |
-| 构建 | 不稳定 | **稳定（splitting: true）** | ✅ |
+| 构建 | 不稳定 | **稳定（splitting）** | ✅ |
 | 遥测外连 | 有 | **0** | ✅ |
 | CodeQL open | 175+ | **0** | 254 fixed · 260 dismissed |
 | as any (核心) | 94 | **0** | ✅ |
-
-### 安全审计（Phase 0-6，已完成）
-
-| 阶段 | 范围 | 关键工作 |
-|:----:|------|----------|
-| 0 | 基线建立 | 降级查询套件，过滤反编译噪音 |
-| 1 | 隐私泄露 | 凭证脱敏、RCS 默认绑 127.0.0.1 |
-| 2 | 结构对齐 | 删除 `src/tools/` 去重，修复工具回归 |
-| 3 | 漏洞修复 | shell 注入、URL 解析、HTML 过滤 |
-| 4 | 残余告警 | 命令注入（which）、ReDoS、净化绕过 |
-| 5 | security-and-quality | 83→39：44 修/dismiss |
-| 6 | 架构债清算 | 47→0：全量风险接受 |
-
-**最终处置**: 254 fixed · 260 dismissed · **0 open**。
-
-### 🧱 反编译的还原上限
-
-在 source-map 重建的范式下，系统性的代码质量改进已触及天花板。后续专注上游更新合并。
 
 ---
 
 ## ⚠️ 免责声明
 
-1. **本项目仅供学习研究用途。** Claude Code 的所有权利归 [Anthropic](https://www.anthropic.com/) 所有。
-2. **非 CCB 官方发布。** CC Pure 是个人维护的纯净分叉，未经 CCB 团队审核或认可。
-3. **不提供任何保证。** 使用本软件即表示您自行承担风险。
-4. **API 使用合规。** 使用第三方 API 需遵守相应服务商条款。本项目不提供任何 API 密钥。
+1. **本项目仅供学习研究用途。** Claude Code 所有权利归 [Anthropic](https://www.anthropic.com/)。
+2. **非 CCB 官方发布。** CC Pure 是个人维护的纯净分叉。
+3. **不提供任何保证。** 使用即表示自行承担风险。
+4. **API 合规。** 使用第三方 API 需遵守服务商条款。
 
 ---
 
 ## 致谢
 
-- [GhostDragon124](https://github.com/GhostDragon124) — 本项目的维护者
+- [GhostDragon124](https://github.com/GhostDragon124) — 维护者
 - [Claude Code Best](https://github.com/claude-code-best/claude-code) — 逆向工程与开源基础
 - [Anthropic](https://www.anthropic.com/) — Claude Code 原作者
