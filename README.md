@@ -93,7 +93,7 @@ python3 scripts/analyze_analytics.py   # today's event report
 tail -f ~/.claude/local_analytics.jsonl # real-time trace
 ```
 
-→ [Claude Code's Light and Shadow: A Telemetry Deep-Dive](docs/Claude_Code_的光明和阴影面.md)
+→ [Claude Code's Light and Shadow: A Telemetry Deep-Dive](docs/Claude_Code_Light_and_Shadow.md)
 
 ### Personality Modes (`soul-distilled`)
 
@@ -117,7 +117,7 @@ tail -f ~/.claude/local_analytics.jsonl # real-time trace
 
 **Custom modes:** Drop a YAML file in `~/.claude/modes/` — auto-loaded alongside built-ins.
 
-→ [CCP Claude Persona SWE-bench Lite Report (v2)](docs/ccp-claude-persona-swebench-report-v2.md) — cross-tool zero-migration. 90 instances: **+11pp** (68.6% vs 57.5%)
+→ [CCP Claude Persona SWE-bench Lite Report (v2)](docs/ccp-claude-persona-swebench-report-v2-en.md) — cross-tool zero-migration. 90 instances: **+11pp** (68.6% vs 57.5%)
 
 ### Coordinator Event Log (`coordinator-sourced`)
 
