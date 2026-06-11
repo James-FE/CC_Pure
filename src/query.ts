@@ -312,6 +312,32 @@ function recordCoordinatorAssistantEvents(
   }
 }
 
+export async function writeCoordinatorCheckpoint(
+  teamContext: string | undefined,
+): Promise<number> {
+  void teamContext
+
+  const store = getEventStore()
+  const events = await store.read()
+  const timestamp = Date.now()
+  await store.append({
+    version: 1,
+    timestamp,
+    coordinatorId: getCoordinatorId(),
+    sessionId: getSessionId(),
+    type: 'coordinator.checkpoint',
+    projectedState: projectTeamState(events),
+  })
+  return timestamp
+}
+
+export async function clearEventsBeforeCheckpoint(
+  teamContext: string | undefined,
+): Promise<void> {
+  const timestamp = await writeCoordinatorCheckpoint(teamContext)
+  await getEventStore().clear(timestamp)
+}
+
 function extractDecisionAttribute(
   attrs: string,
   name: 'action' | 'worker',
@@ -426,6 +452,12 @@ export async function* query(
         terminal?.reason === 'aborted_streaming' ||
         terminal?.reason === 'aborted_tools'
       endTrace(langfuseTrace, undefined, isAborted ? 'interrupted' : undefined)
+    }
+
+    if (isCoordinatorMode()) {
+      void getEventStore()
+        .clear()
+        .catch(() => {})
     }
   }
 
@@ -731,6 +763,10 @@ async function* queryLoop(
         compactionResult,
         teamContext,
       )
+
+      if (isCoordinatorMode()) {
+        void clearEventsBeforeCheckpoint(teamContext).catch(() => {})
+      }
 
       for (const message of postCompactMessages) {
         yield message
@@ -1407,6 +1443,9 @@ async function* queryLoop(
             compacted,
             teamContext,
           )
+          if (isCoordinatorMode()) {
+            void clearEventsBeforeCheckpoint(teamContext).catch(() => {})
+          }
           for (const msg of postCompactMessages) {
             yield msg
           }
