@@ -2,7 +2,7 @@
   <a href="./README.md">English</a>
 </div>
 
-# CC Pure — 纯净版 Claude Code
+# CC Pure — Claude Code 学习版
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-black?style=flat-square&logo=bun)](https://bun.sh/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)]()
@@ -10,7 +10,7 @@
 [![CodeQL](https://img.shields.io/badge/CodeQL-0%20open%20%C2%B7%2047%20risk%20accepted-yellow?style=flat-square)]()
 [![TypeScript](https://img.shields.io/badge/tsc-0%20errors-brightgreen?style=flat-square)]()
 
-> Claude Code 的纯净分叉 —— 去遥测、去企业全家桶、保留核心能力。**已抵达 source-map 还原的上限。**
+> Claude Code 学习版 —— 个人维护，去遥测、保留核心能力。仅供学习研究。
 >
 > **当前版本（2026-06）：** 人格系统 · Coordinator SQLite 黑板 · 类型完工 · CodeQL 归零
 

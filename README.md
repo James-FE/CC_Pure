@@ -2,7 +2,7 @@
   <a href="./README_CN.md">中文</a>
 </div>
 
-# CC Pure — A Clean Fork of Claude Code
+# CC Pure — Claude Code Study Edition
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-black?style=flat-square&logo=bun)](https://bun.sh/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)]()
@@ -10,7 +10,7 @@
 [![CodeQL](https://img.shields.io/badge/CodeQL-0%20open%20%C2%B7%2047%20risk%20accepted-yellow?style=flat-square)]()
 [![TypeScript](https://img.shields.io/badge/tsc-0%20errors-brightgreen?style=flat-square)]()
 
-> A clean, independently-maintained fork of Claude Code. **Telemetry removed. Types fixed. Core capabilities preserved.**
+> A clean, independently-maintained study edition. **Telemetry removed. Types fixed. Core capabilities preserved.**
 >
 > **Current (2026-06):** Personality system · Coordinator SQLite blackboard · 0 tsc errors · 0 CodeQL
 
