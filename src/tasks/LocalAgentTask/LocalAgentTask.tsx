@@ -20,6 +20,7 @@ import { createTaskStateBase } from '../../Task.js';
 import type { Tools } from '../../Tool.js';
 import { findToolByName } from '../../Tool.js';
 import type { AgentToolResult } from '@claude-code-best/builtin-tools/tools/AgentTool/agentToolUtils.js';
+import { writeWorkerResult, writeWorkerStatus } from '../../blackboard/BlackboardLifecycle.js';
 import type { AgentDefinition } from '@claude-code-best/builtin-tools/tools/AgentTool/loadAgentsDir.js';
 import { SYNTHETIC_OUTPUT_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/SyntheticOutputTool/SyntheticOutputTool.js';
 import { asAgentId } from '../../types/ids.js';
@@ -373,6 +374,7 @@ export function killAsyncAgent(taskId: string, setAppState: SetAppState): void {
     };
   });
   if (killed) {
+    writeWorkerStatus(taskId, 'failed');
     void evictTaskOutput(taskId);
   }
 }
@@ -500,6 +502,8 @@ export function completeAgentTask(result: AgentToolResult, setAppState: SetAppSt
       selectedAgent: undefined,
     };
   });
+  writeWorkerStatus(taskId, 'done');
+  writeWorkerResult(taskId, result.content.map(block => block.text).join('\n'));
   void evictTaskOutput(taskId);
   // Note: Notification is sent by AgentTool via enqueueAgentNotification
 }
@@ -526,6 +530,7 @@ export function failAgentTask(taskId: string, error: string, setAppState: SetApp
       selectedAgent: undefined,
     };
   });
+  writeWorkerStatus(taskId, 'failed');
   void evictTaskOutput(taskId);
   // Note: Notification is sent by AgentTool via enqueueAgentNotification
 }
@@ -589,6 +594,7 @@ export function registerAsyncAgent({
 
   // Register task in AppState
   registerTask(taskState, setAppState);
+  writeWorkerStatus(agentId, 'running');
 
   return taskState;
 }
@@ -658,6 +664,7 @@ export function registerAgentForeground({
   backgroundSignalResolvers.set(agentId, resolveBackgroundSignal!);
 
   registerTask(taskState, setAppState);
+  writeWorkerStatus(agentId, 'running');
 
   // Auto-background after timeout if configured
   let cancelAutoBackground: (() => void) | undefined;
