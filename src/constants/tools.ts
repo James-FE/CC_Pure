@@ -22,6 +22,7 @@ import { TASK_CREATE_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/Tas
 import { TASK_GET_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/TaskGetTool/constants.js'
 import { TASK_LIST_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/TaskListTool/constants.js'
 import { TASK_UPDATE_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/TaskUpdateTool/constants.js'
+import { BLACKBOARD_WORKER_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/BlackboardTool/constants.js'
 import { TOOL_SEARCH_TOOL_NAME } from 'src/tools/ToolSearchTool/prompt.js'
 import { SYNTHETIC_OUTPUT_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/SyntheticOutputTool/SyntheticOutputTool.js'
 import { SLEEP_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/SleepTool/prompt.js'
@@ -77,6 +78,7 @@ export const ASYNC_AGENT_ALLOWED_TOOLS = new Set([
   TOOL_SEARCH_TOOL_NAME,
   ENTER_WORKTREE_TOOL_NAME,
   EXIT_WORKTREE_TOOL_NAME,
+  BLACKBOARD_WORKER_TOOL_NAME,
 ])
 /**
  * Tools allowed only for in-process teammates (not general async agents).

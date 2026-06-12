@@ -39,7 +39,7 @@ function getWorkerIdFromStatusKey(key: string): string | null {
 
 function getWorkerStatusRows(db: Database): WorkerStatusRow[] {
   return db
-    .query<WorkerStatusRow, null>(
+    .query<WorkerStatusRow, []>(
       `
         SELECT key, value, updated_at
         FROM blackboard
@@ -47,7 +47,7 @@ function getWorkerStatusRows(db: Database): WorkerStatusRow[] {
         ORDER BY key ASC
       `,
     )
-    .all(null)
+    .all()
 }
 
 export function cleanupStaleWorkers(db: Database, maxAgeSeconds: number): void {
@@ -64,8 +64,8 @@ export function cleanupOrphanedKeys(
   validPrefixes: readonly string[],
 ): void {
   const rows = db
-    .query<KeyRow, null>('SELECT key FROM blackboard ORDER BY key ASC')
-    .all(null)
+    .query<KeyRow, []>('SELECT key FROM blackboard ORDER BY key ASC')
+    .all()
 
   for (const row of rows) {
     if (validPrefixes.some(prefix => row.key.startsWith(prefix))) continue
