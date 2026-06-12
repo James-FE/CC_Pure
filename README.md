@@ -31,7 +31,7 @@ curl -fsSL https://bun.sh/install | bash
 
 ```bash
 # Option 1: Pre-built (no build required — macOS & Linux)
-curl -L https://github.com/James-FE/CC_Pure/releases/latest/download/ccp.tar.gz | tar xz
+curl -L https://github.com/James-FE/CC_Pure/releases/latest/download/ccp-v2.6.11.tar.gz | tar xz
 cd dist-nosplit && bun cli.js --version
 
 # Option 2: Build from source

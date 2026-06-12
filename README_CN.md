@@ -31,7 +31,7 @@ curl -fsSL https://bun.sh/install | bash
 
 ```bash
 # 方式一：预构建包（无需编译 — 支持 macOS 和 Linux）
-curl -L https://github.com/James-FE/CC_Pure/releases/latest/download/ccp.tar.gz | tar xz
+curl -L https://github.com/James-FE/CC_Pure/releases/latest/download/ccp-v2.6.11.tar.gz | tar xz
 cd dist-nosplit && bun cli.js --version
 
 # 方式二：从源码构建
