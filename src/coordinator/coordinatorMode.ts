@@ -14,6 +14,12 @@ import { SYNTHETIC_OUTPUT_TOOL_NAME } from '@claude-code-best/builtin-tools/tool
 import { TASK_STOP_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/TaskStopTool/prompt.js'
 import { TEAM_CREATE_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/TeamCreateTool/constants.js'
 import { TEAM_DELETE_TOOL_NAME } from '@claude-code-best/builtin-tools/tools/TeamDeleteTool/constants.js'
+import {
+  getSessionBlackboard,
+  initializeSessionBlackboard,
+} from 'src/blackboard/BlackboardSession.js'
+import type { BlackboardEntry } from 'src/blackboard/BlackboardTypes.js'
+import { getByPrefix } from 'src/blackboard/BlackboardStore.js'
 import { getSessionId } from '../bootstrap/state.js'
 import type { UserMessage } from '../types/message.js'
 import { isEnvTruthy } from '../utils/envUtils.js'
@@ -97,6 +103,12 @@ export function recordCoordinatorSessionStarted(
     return
   }
 
+  try {
+    initializeSessionBlackboard(sessionId)
+  } catch {
+    // Session startup should continue even if the blackboard cannot open.
+  }
+
   void getEventStore()
     .append({
       version: 1,
@@ -108,11 +120,50 @@ export function recordCoordinatorSessionStarted(
     .catch(() => {})
 }
 
+function renderBlackboardTeamContext(
+  entries: readonly BlackboardEntry[],
+): string {
+  const lines = entries.map(
+    entry =>
+      `- ${entry.key} = ${entry.value} (v${entry.version}, by ${entry.updatedBy}, at ${entry.updatedAt})`,
+  )
+  return `Blackboard team state:\n${lines.join('\n')}`
+}
+
+export function buildBlackboardTeamContext(): string | undefined {
+  if (!isCoordinatorMode()) {
+    return undefined
+  }
+
+  try {
+    const db = getSessionBlackboard()
+    const entries = [
+      ...getByPrefix(db, 'worker:'),
+      ...getByPrefix(db, 'team:'),
+      ...getByPrefix(db, 'coordinator:'),
+    ]
+    if (entries.length === 0) {
+      return undefined
+    }
+    return renderBlackboardTeamContext(entries)
+  } catch {
+    return undefined
+  }
+}
+
 export async function buildRecoveredTeamContextMessage(): Promise<
   UserMessage | undefined
 > {
   if (!isCoordinatorMode()) {
     return undefined
+  }
+
+  const blackboardContext = buildBlackboardTeamContext()
+  if (blackboardContext) {
+    return createUserMessage({
+      content: blackboardContext,
+      isMeta: true,
+    })
   }
 
   const events = await getEventStore().read()

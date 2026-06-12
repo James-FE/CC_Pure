@@ -11,7 +11,10 @@ import {
   type AutoCompactTrackingState,
 } from './services/compact/autoCompact.js'
 import { buildPostCompactMessages } from './services/compact/compact.js'
-import { isCoordinatorMode } from './coordinator/coordinatorMode.js'
+import {
+  buildBlackboardTeamContext,
+  isCoordinatorMode,
+} from './coordinator/coordinatorMode.js'
 import {
   getCoordinatorId,
   getEventStore,
@@ -349,6 +352,11 @@ function extractDecisionAttribute(
 async function buildCoordinatorTeamContext(): Promise<string | undefined> {
   if (!isCoordinatorMode()) {
     return undefined
+  }
+
+  const blackboardContext = buildBlackboardTeamContext()
+  if (blackboardContext) {
+    return blackboardContext
   }
 
   const events = await getEventStore().read()
