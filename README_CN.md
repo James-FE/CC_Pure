@@ -9,6 +9,7 @@
 [![Tests](https://img.shields.io/badge/tests-3986-brightgreen?style=flat-square)]()
 [![CodeQL](https://img.shields.io/badge/CodeQL-0%20open%20%C2%B7%2047%20risk%20accepted-yellow?style=flat-square)]()
 [![TypeScript](https://img.shields.io/badge/tsc-0%20errors-brightgreen?style=flat-square)]()
+[![下载](https://img.shields.io/badge/下载-最新版-blue?style=flat-square)](https://github.com/James-FE/CC_Pure/releases/latest)
 
 > Claude Code 学习版 —— 个人维护，去遥测、保留核心能力。仅供学习研究。
 >
@@ -29,10 +30,15 @@ curl -fsSL https://bun.sh/install | bash
 ### 安装
 
 ```bash
+# 方式一：预构建包（无需编译 — 支持 macOS 和 Linux）
+curl -L https://github.com/James-FE/CC_Pure/releases/latest/download/ccp.tar.gz | tar xz
+cd dist-nosplit && bun cli.js --version
+
+# 方式二：从源码构建
 git clone https://github.com/James-FE/CC_Pure.git
 cd CC_Pure
 bun install
-bun run build          # 构建到 dist/（split build, ~586 files）
+bun run build
 ```
 
 ### 配置 API

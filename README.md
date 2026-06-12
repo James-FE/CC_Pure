@@ -9,6 +9,7 @@
 [![Tests](https://img.shields.io/badge/tests-3986-brightgreen?style=flat-square)]()
 [![CodeQL](https://img.shields.io/badge/CodeQL-0%20open%20%C2%B7%2047%20risk%20accepted-yellow?style=flat-square)]()
 [![TypeScript](https://img.shields.io/badge/tsc-0%20errors-brightgreen?style=flat-square)]()
+[![Download](https://img.shields.io/badge/download-latest-blue?style=flat-square)](https://github.com/James-FE/CC_Pure/releases/latest)
 
 > A clean, independently-maintained study edition. **Telemetry removed. Types fixed. Core capabilities preserved.**
 >
@@ -29,10 +30,15 @@ curl -fsSL https://bun.sh/install | bash
 ### Install
 
 ```bash
+# Option 1: Pre-built (no build required — macOS & Linux)
+curl -L https://github.com/James-FE/CC_Pure/releases/latest/download/ccp.tar.gz | tar xz
+cd dist-nosplit && bun cli.js --version
+
+# Option 2: Build from source
 git clone https://github.com/James-FE/CC_Pure.git
 cd CC_Pure
 bun install
-bun run build          # builds to dist/ (split build, ~586 files)
+bun run build
 ```
 
 ### Configure API
