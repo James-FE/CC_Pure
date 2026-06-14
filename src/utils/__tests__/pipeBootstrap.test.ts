@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test'
+import { readFileSync } from 'fs'
 import type { SessionId } from '../../types/ids.js'
 import type { LanBeacon } from '../lanBeacon.js'
 import type { DetermineRoleResult, PipeRegistryEntry } from '../pipeRegistry.js'
@@ -107,6 +108,24 @@ afterEach(async () => {
 })
 
 describe('ensurePipeIpc', () => {
+  test('keeps heavy pipe modules behind dynamic imports', () => {
+    const source = readFileSync(
+      new URL('../pipeBootstrap.ts', import.meta.url),
+      'utf8',
+    )
+
+    expect(source).not.toContain("import * as lb from 'src/utils/lanBeacon.js'")
+    expect(source).not.toContain(
+      "import * as pr from 'src/utils/pipeRegistry.js'",
+    )
+    expect(source).not.toContain(
+      "import * as pt from 'src/utils/pipeTransport.js'",
+    )
+    expect(source).toContain("import('src/utils/lanBeacon.js')")
+    expect(source).toContain("import('src/utils/pipeRegistry.js')")
+    expect(source).toContain("import('src/utils/pipeTransport.js')")
+  })
+
   test('coalesces concurrent calls into one pipe server and preserves LAN tcp entry', async () => {
     enabledFeatures.add('LAN_PIPES')
     const { ensurePipeIpc } = await loadPipeBootstrap()

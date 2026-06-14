@@ -835,9 +835,6 @@ export async function runHeadless(
   await ensureModelStringsInitialized()
   headlessProfilerCheckpoint('after_modelStrings')
 
-  // UDS inbox store registration is deferred until after `run` is defined
-  // so we can pass `run` as the onEnqueue callback (see below).
-
   // Only `json` + `verbose` needs the full array (jsonStringify(messages) below).
   // For stream-json (SDK/CCR) and default text output, only the last message is
   // read for the exit code / final result. Avoid accumulating every message in
@@ -1858,10 +1855,19 @@ function runHeadlessStreaming(
         }
       : undefined
 
-  // Abort the current operation when a 'now' priority message arrives.
-  subscribeToCommandQueue(() => {
+  // Only main-thread commands (agentId===undefined) — subagent
+  // notifications are drained by the subagent's mid-turn gate in query.ts.
+  const isMainThread = (cmd: QueuedCommand) => cmd.agentId === undefined
+
+  // Abort the current operation when a 'now' priority message arrives, and
+  // wake the headless runner when any external producer enqueues work while
+  // the input stream is idle.
+  const unsubscribeCommandQueue = subscribeToCommandQueue(() => {
     if (abortController && getCommandsByMaxPriority('now').length > 0) {
       abortController.abort('interrupt')
+    }
+    if (!inputClosed && peek(isMainThread) !== undefined) {
+      void run()
     }
   })
 
@@ -1919,12 +1925,6 @@ function runHeadlessStreaming(
       )
       setupPluginHookHotReload()
     }
-
-    // Only main-thread commands (agentId===undefined) — subagent
-    // notifications are drained by the subagent's mid-turn gate in query.ts.
-    // Defined outside the try block so it's accessible in the post-finally
-    // queue re-checks at the bottom of run().
-    const isMainThread = (cmd: QueuedCommand) => cmd.agentId === undefined
 
     try {
       let command: QueuedCommand | undefined
@@ -2683,24 +2683,12 @@ function runHeadlessStreaming(
         suggestionState.abortController = null
         await finalizePendingAsyncHooks()
         unsubscribeSkillChanges()
+        unsubscribeCommandQueue()
         unsubscribeAuthStatus?.()
         statusListeners.delete(rateLimitListener)
         output.done()
       }
     }
-  }
-
-  // Set up UDS inbox callback so the query loop is kicked off
-  // when a message arrives via the UDS socket in headless mode.
-  if (feature('UDS_INBOX')) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
-    const { setOnEnqueue } = require('../utils/udsMessaging.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
-    setOnEnqueue(() => {
-      if (!inputClosed) {
-        void run()
-      }
-    })
   }
 
   // Cron scheduler: runs scheduled_tasks.json tasks in SDK/-p mode.
@@ -4166,6 +4154,7 @@ function runHeadlessStreaming(
       suggestionState.abortController = null
       await finalizePendingAsyncHooks()
       unsubscribeSkillChanges()
+      unsubscribeCommandQueue()
       unsubscribeAuthStatus?.()
       statusListeners.delete(rateLimitListener)
       output.done()

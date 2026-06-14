@@ -9,28 +9,28 @@ import { feature } from 'bun:bundle'
 import { hostname } from 'os'
 import { getSessionId } from 'src/bootstrap/state.js'
 import { registerCleanup } from 'src/utils/cleanupRegistry.js'
-import * as lb from 'src/utils/lanBeacon.js'
-import * as pr from 'src/utils/pipeRegistry.js'
-import * as pt from 'src/utils/pipeTransport.js'
+import type { LanBeacon } from 'src/utils/lanBeacon.js'
 import type { PipeRegistryEntry } from 'src/utils/pipeRegistry.js'
 import type { PipeServer } from 'src/utils/pipeTransport.js'
 
 type PipeBootstrapDeps = {
   getSessionId: typeof getSessionId
   registerCleanup: typeof registerCleanup
-  createPipeServer: typeof pt.createPipeServer
-  getLocalIp: typeof pt.getLocalIp
-  getMachineId: typeof pr.getMachineId
-  getMacAddress: typeof pr.getMacAddress
-  determineRole: typeof pr.determineRole
-  registerAsMain: typeof pr.registerAsMain
-  registerAsSub: typeof pr.registerAsSub
-  unregister: typeof pr.unregister
+  createPipeServer: typeof import('src/utils/pipeTransport.js').createPipeServer
+  getLocalIp: typeof import('src/utils/pipeTransport.js').getLocalIp
+  getMachineId: typeof import('src/utils/pipeRegistry.js').getMachineId
+  getMacAddress: typeof import('src/utils/pipeRegistry.js').getMacAddress
+  determineRole: typeof import('src/utils/pipeRegistry.js').determineRole
+  registerAsMain: typeof import('src/utils/pipeRegistry.js').registerAsMain
+  registerAsSub: typeof import('src/utils/pipeRegistry.js').registerAsSub
+  unregister: typeof import('src/utils/pipeRegistry.js').unregister
   hostname: typeof hostname
   createLanBeacon: (
-    announce: ConstructorParameters<typeof lb.LanBeacon>[0],
-  ) => lb.LanBeacon
-  setLanBeacon: typeof lb.setLanBeacon
+    announce: ConstructorParameters<
+      typeof import('src/utils/lanBeacon.js').LanBeacon
+    >[0],
+  ) => LanBeacon
+  setLanBeacon: typeof import('src/utils/lanBeacon.js').setLanBeacon
 }
 
 export type PipeIpcBootstrap = {
@@ -44,7 +44,7 @@ export type PipeIpcBootstrap = {
   displayRole: string
   entry: PipeRegistryEntry
   server: PipeServer
-  beacon: lb.LanBeacon | null
+  beacon: LanBeacon | null
   handlersAttached: boolean
   cleanup: () => Promise<void>
 }
@@ -70,14 +70,13 @@ export function ensurePipeIpc(): Promise<PipeIpcBootstrap | null> {
     return Promise.resolve(null)
   }
 
-  const deps = getPipeBootstrapDeps()
-  const sessionId = deps.getSessionId()
+  const sessionId = getPipeBootstrapSessionId()
   if (!sessionId) {
     return Promise.resolve(null)
   }
 
   if (!bootstrapPromise) {
-    bootstrapPromise = bootstrapPipeIpc(sessionId, deps).catch(() => {
+    bootstrapPromise = bootstrapPipeIpc(sessionId).catch(() => {
       bootstrapPromise = null
       return null
     })
@@ -88,11 +87,11 @@ export function ensurePipeIpc(): Promise<PipeIpcBootstrap | null> {
 
 async function bootstrapPipeIpc(
   sessionId: string,
-  deps: PipeBootstrapDeps,
 ): Promise<PipeIpcBootstrap | null> {
+  const deps = await getPipeBootstrapDeps()
   const pipeName = `cli-${sessionId.slice(0, 8)}`
   let server: PipeServer | null = null
-  let beacon: lb.LanBeacon | null = null
+  let beacon: LanBeacon | null = null
   let registered = false
 
   try {
@@ -214,24 +213,36 @@ async function bootstrapPipeIpc(
   }
 }
 
-function getPipeBootstrapDeps(): PipeBootstrapDeps {
-  return (
-    depsOverrideForTests ?? {
-      getSessionId,
-      registerCleanup,
-      createPipeServer: pt.createPipeServer,
-      getLocalIp: pt.getLocalIp,
-      getMachineId: pr.getMachineId,
-      getMacAddress: pr.getMacAddress,
-      determineRole: pr.determineRole,
-      registerAsMain: pr.registerAsMain,
-      registerAsSub: pr.registerAsSub,
-      unregister: pr.unregister,
-      hostname,
-      createLanBeacon: announce => new lb.LanBeacon(announce),
-      setLanBeacon: lb.setLanBeacon,
-    }
-  )
+function getPipeBootstrapSessionId(): ReturnType<typeof getSessionId> {
+  return depsOverrideForTests?.getSessionId() ?? getSessionId()
+}
+
+async function getPipeBootstrapDeps(): Promise<PipeBootstrapDeps> {
+  if (depsOverrideForTests) {
+    return depsOverrideForTests
+  }
+
+  const [pt, pr, lb] = await Promise.all([
+    import('src/utils/pipeTransport.js'),
+    import('src/utils/pipeRegistry.js'),
+    import('src/utils/lanBeacon.js'),
+  ])
+
+  return {
+    getSessionId,
+    registerCleanup,
+    createPipeServer: pt.createPipeServer,
+    getLocalIp: pt.getLocalIp,
+    getMachineId: pr.getMachineId,
+    getMacAddress: pr.getMacAddress,
+    determineRole: pr.determineRole,
+    registerAsMain: pr.registerAsMain,
+    registerAsSub: pr.registerAsSub,
+    unregister: pr.unregister,
+    hostname,
+    createLanBeacon: announce => new lb.LanBeacon(announce),
+    setLanBeacon: lb.setLanBeacon,
+  }
 }
 
 function udsInboxEnabled(): boolean {

@@ -1,9 +1,5 @@
-import { useMasterMonitor } from '../hooks/useMasterMonitor.js';
-import { useSlaveNotifications } from '../hooks/useSlaveNotifications.js';
-import { usePipeIpc } from '../hooks/usePipeIpc.js';
-import { usePipePermissionForward } from '../hooks/usePipePermissionForward.js';
-import { usePipeMuteSync } from '../hooks/usePipeMuteSync.js';
-import { usePipeRouter } from '../hooks/usePipeRouter.js';
+import { useEffect, useState } from 'react';
+import type React from 'react';
 
 export interface PipeSubsystemProps {
   store: any;
@@ -17,23 +13,22 @@ export interface PipeSubsystemProps {
   addNotification: any;
 }
 
-export default function PipeSubsystem({
-  store,
-  handleIncomingPrompt,
-  tools,
-  setMessages,
-  setToolUseConfirmQueue,
-  getToolUseContext,
-  mainLoopModel,
-  setAppState,
-  addNotification,
-}: PipeSubsystemProps): null {
-  useMasterMonitor();
-  useSlaveNotifications();
-  usePipePermissionForward({ store, tools, setMessages, setToolUseConfirmQueue, getToolUseContext, mainLoopModel });
-  usePipeMuteSync({ setToolUseConfirmQueue });
-  usePipeIpc({ store, handleIncomingPrompt });
-  usePipeRouter({ store, setAppState, addNotification });
+export default function PipeSubsystem(props: PipeSubsystemProps): React.ReactNode {
+  const [PipeSubsystemImpl, setPipeSubsystemImpl] = useState<React.ComponentType<PipeSubsystemProps> | null>(null);
 
-  return null;
+  useEffect(() => {
+    let alive = true;
+    const timer = setTimeout(() => {
+      void import('./PipeSubsystemImpl.js').then(m => {
+        if (alive) setPipeSubsystemImpl(() => m.default);
+      });
+    }, 0);
+
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, []);
+
+  return PipeSubsystemImpl ? <PipeSubsystemImpl {...props} /> : null;
 }

@@ -777,6 +777,8 @@ export type Props = {
   directConnectConfig?: DirectConnectConfig;
   // SSH session for `claude ssh` mode (local REPL, remote tools over ssh)
   sshSession?: SSHSession;
+  // Enables the Pipe IPC subsystem for explicit multi-instance pipe usage.
+  enablePipeSubsystem?: boolean;
   // Thinking configuration to use when thinking is enabled
   thinkingConfig: ThinkingConfig;
 };
@@ -808,6 +810,7 @@ export function REPL({
   remoteSessionConfig,
   directConnectConfig,
   sshSession,
+  enablePipeSubsystem = false,
   thinkingConfig,
 }: Props): React.ReactNode {
   const isRemoteSession = !!remoteSessionConfig;
@@ -4807,18 +4810,21 @@ export function REPL({
 
   useMailboxBridge({ isLoading, onSubmitMessage: handleIncomingPrompt });
 
-  // --- Pipe IPC lifecycle (UDS_INBOX) — lazily loaded ---
+  // --- Pipe IPC lifecycle (LAN_PIPES) — lazily loaded ---
   const [PipeSubsystem, setPipeSubsystem] = useState<React.ComponentType<PipeSubsystemProps> | null>(null);
-  useEffect(() => {
-    if (!feature('UDS_INBOX')) return;
-    let alive = true;
-    void import('./PipeSubsystem.js').then(m => {
-      if (alive) setPipeSubsystem(() => m.default);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  if (feature('LAN_PIPES')) {
+    // biome-ignore lint/correctness/useHookAtTopLevel: feature() is a compile-time constant
+    useEffect(() => {
+      if (!enablePipeSubsystem) return;
+      let alive = true;
+      void import('./PipeSubsystem.js').then(m => {
+        if (alive) setPipeSubsystem(() => m.default);
+      });
+      return () => {
+        alive = false;
+      };
+    }, [enablePipeSubsystem]);
+  }
 
   // Scheduled tasks from .claude/scheduled_tasks.json (CronCreate/Delete/List)
   if (feature('AGENT_TRIGGERS')) {

@@ -3598,6 +3598,7 @@ async function run(): Promise<CommanderCommand> {
         disableSlashCommands,
         dynamicMcpConfig,
         strictMcpConfig,
+        enablePipeSubsystem: Boolean(messagingSocketPath),
         systemPrompt,
         appendSystemPrompt,
         taskListId,
