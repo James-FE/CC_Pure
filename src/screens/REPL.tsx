@@ -331,12 +331,7 @@ import { isBgSession, updateSessionName, updateSessionActivity } from '../utils/
 import { isInProcessTeammateTask, type InProcessTeammateTaskState } from '../tasks/InProcessTeammateTask/types.js';
 import { restoreRemoteAgentTasks } from '../tasks/RemoteAgentTask/RemoteAgentTask.js';
 import { useInboxPoller } from '../hooks/useInboxPoller.js';
-import { useMasterMonitor } from '../hooks/useMasterMonitor.js';
-import { useSlaveNotifications } from '../hooks/useSlaveNotifications.js';
-import { usePipeIpc } from '../hooks/usePipeIpc.js';
-import { usePipePermissionForward } from '../hooks/usePipePermissionForward.js';
-import { usePipeMuteSync } from '../hooks/usePipeMuteSync.js';
-import { usePipeRouter } from '../hooks/usePipeRouter.js';
+import type { PipeSubsystemProps } from './PipeSubsystem.js';
 import * as proactiveModuleValue from '../proactive/index.js';
 import { useProactive as useProactiveValue } from '../proactive/useProactive.js';
 import { useScheduledTasks as useScheduledTasksValue } from '../hooks/useScheduledTasks.js';
@@ -4812,13 +4807,18 @@ export function REPL({
 
   useMailboxBridge({ isLoading, onSubmitMessage: handleIncomingPrompt });
 
-  // --- Pipe IPC lifecycle (UDS_INBOX) ---
-  useMasterMonitor();
-  useSlaveNotifications();
-  usePipePermissionForward({ store, tools, setMessages, setToolUseConfirmQueue, getToolUseContext, mainLoopModel });
-  usePipeMuteSync({ setToolUseConfirmQueue });
-  usePipeIpc({ store, handleIncomingPrompt });
-  const { routeToSelectedPipes } = usePipeRouter({ store, setAppState, addNotification });
+  // --- Pipe IPC lifecycle (UDS_INBOX) — lazily loaded ---
+  const [PipeSubsystem, setPipeSubsystem] = useState<React.ComponentType<PipeSubsystemProps> | null>(null);
+  useEffect(() => {
+    if (!feature('UDS_INBOX')) return;
+    let alive = true;
+    void import('./PipeSubsystem.js').then(m => {
+      if (alive) setPipeSubsystem(() => m.default);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Scheduled tasks from .claude/scheduled_tasks.json (CronCreate/Delete/List)
   if (feature('AGENT_TRIGGERS')) {
@@ -5286,6 +5286,19 @@ export function REPL({
           />
         ) : null}
         <CommandKeybindingHandlers onSubmit={onSubmit} isActive={!toolJSX?.isLocalJSXCommand} />
+        {PipeSubsystem && (
+          <PipeSubsystem
+            store={store}
+            handleIncomingPrompt={handleIncomingPrompt}
+            tools={tools}
+            setMessages={setMessages}
+            setToolUseConfirmQueue={setToolUseConfirmQueue}
+            getToolUseContext={getToolUseContext}
+            mainLoopModel={mainLoopModel}
+            setAppState={setAppState}
+            addNotification={addNotification}
+          />
+        )}
         {transcriptScrollRef ? (
           // ScrollKeybindingHandler must mount before CancelRequestHandler so
           // ctrl+c-with-selection copies instead of cancelling the active task.
@@ -5500,6 +5513,19 @@ export function REPL({
         />
       ) : null}
       <CommandKeybindingHandlers onSubmit={onSubmit} isActive={!toolJSX?.isLocalJSXCommand} />
+      {PipeSubsystem && (
+        <PipeSubsystem
+          store={store}
+          handleIncomingPrompt={handleIncomingPrompt}
+          tools={tools}
+          setMessages={setMessages}
+          setToolUseConfirmQueue={setToolUseConfirmQueue}
+          getToolUseContext={getToolUseContext}
+          mainLoopModel={mainLoopModel}
+          setAppState={setAppState}
+          addNotification={addNotification}
+        />
+      )}
       {/* ScrollKeybindingHandler must mount before CancelRequestHandler so
           ctrl+c-with-selection copies instead of cancelling the active task.
           Its raw useInput handler only stops propagation when a selection
