@@ -21,7 +21,13 @@ const result = await Bun.build({
   outdir,
   target: 'bun',
   splitting: true,
-  define: getMacroDefines(),
+  sourcemap: 'linked',
+  define: {
+    ...getMacroDefines(),
+    // React production mode — eliminates _debugStack Error objects
+    // and prop-type / key warnings not useful in a production CLI tool.
+    'process.env.NODE_ENV': JSON.stringify('production'),
+  },
   features,
 })
 
@@ -56,7 +62,7 @@ console.log(
   `Bundled ${result.outputs.length} files to ${outdir}/ (patched ${patched} for Node.js compat)`,
 )
 
-// Step 4: Copy vendor binaries (audio-capture, ripgrep)
+// Step 4: Copy vendor binaries (audio-capture, ripgrep, seccomp)
 const distVendorAudio = join(outdir, 'vendor', 'audio-capture')
 await cp('vendor/audio-capture', distVendorAudio, { recursive: true })
 console.log(`Copied vendor/audio-capture/ → ${distVendorAudio}/`)
@@ -64,6 +70,14 @@ console.log(`Copied vendor/audio-capture/ → ${distVendorAudio}/`)
 const distVendorRg = join(outdir, 'vendor', 'ripgrep')
 await cp('src/utils/vendor/ripgrep', distVendorRg, { recursive: true })
 console.log(`Copied src/utils/vendor/ripgrep/ → ${distVendorRg}/`)
+
+const distVendorSeccomp = join(outdir, 'vendor', 'seccomp')
+await cp(
+  'node_modules/@anthropic-ai/sandbox-runtime/vendor/seccomp',
+  distVendorSeccomp,
+  { recursive: true },
+)
+console.log(`Copied seccomp/ → ${distVendorSeccomp}/`)
 
 // Step 5: Bundle download-ripgrep script as standalone JS for postinstall
 const rgScript = await Bun.build({
@@ -110,4 +124,12 @@ if (!noSplitResult.success) {
   const noSplitVendorRg = join(noSplitDir, 'vendor', 'ripgrep')
   await cp('src/utils/vendor/ripgrep', noSplitVendorRg, { recursive: true })
   console.log(`Copied src/utils/vendor/ripgrep/ → ${noSplitVendorRg}/`)
+
+  const noSplitVendorSeccomp = join(noSplitDir, 'vendor', 'seccomp')
+  await cp(
+    'node_modules/@anthropic-ai/sandbox-runtime/vendor/seccomp',
+    noSplitVendorSeccomp,
+    { recursive: true },
+  )
+  console.log(`Copied seccomp/ → ${noSplitVendorSeccomp}/`)
 }
