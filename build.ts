@@ -99,20 +99,9 @@ if (!rgScript.success) {
 // Code-split build hangs on chunk lazy-loading with Bun 1.3.11,
 // so we provide a no-split alternative for the CLI launcher.
 //
-// UDS_INBOX adds a deep import chain (net, dgram, crypto, child_process)
-// that blocks cold start in non-split bundles (~30s timeout). Split builds
-// handle it via dynamic import() chunk splitting — see replLauncher.tsx.
-//
-// CURRENT LIMITATION: filtering UDS_INBOX from noSplitFeatures means pipe
-// commands (inbox/pipe/peers) are silently unavailable in the no-split build.
-// This is a stopgap, not the real fix.
-//
-// REAL FIX (TODO): defer pipe initialization to after REPL render via
-// setTimeout(() => import('./pipeBootstrap'), 0), so cold start is fast
-// and pipe commands work on first use (with a brief one-time delay).
-// Until then, use split build (dist/cli.js) if you need UDS_INBOX.
-const noSplitFeatures = features.filter(f => f !== 'UDS_INBOX')
-
+// UDS_INBOX's import chain (pipeBootstrap → net, dgram, crypto, etc.)
+// is now fully lazy-loaded via usePipeIpc.ts → dynamic import(usePipeIpcImpl.ts).
+// Cold start is fast across split, no-split, and dev modes.
 const noSplitDir = 'dist-nosplit'
 rmSync(noSplitDir, { recursive: true, force: true })
 const noSplitResult = await Bun.build({
@@ -121,7 +110,7 @@ const noSplitResult = await Bun.build({
   target: 'bun',
   splitting: false,
   define: getMacroDefines(),
-  features: noSplitFeatures,
+  features,
 })
 if (!noSplitResult.success) {
   console.error('No-split build failed:')
