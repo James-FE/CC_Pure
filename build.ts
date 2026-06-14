@@ -98,6 +98,11 @@ if (!rgScript.success) {
 // Step 6: Build no-split single-file bundle for CLI
 // Code-split build hangs on chunk lazy-loading with Bun 1.3.11,
 // so we provide a no-split alternative for the CLI launcher.
+// UDS_INBOX adds a deep import chain (net, dgram, crypto, child_process)
+// that blocks cold start in non-split bundles. Split builds lazy-load fine
+// via dynamic import() — see replLauncher.tsx.
+const noSplitFeatures = features.filter(f => f !== 'UDS_INBOX')
+
 const noSplitDir = 'dist-nosplit'
 rmSync(noSplitDir, { recursive: true, force: true })
 const noSplitResult = await Bun.build({
@@ -106,7 +111,7 @@ const noSplitResult = await Bun.build({
   target: 'bun',
   splitting: false,
   define: getMacroDefines(),
-  features,
+  features: noSplitFeatures,
 })
 if (!noSplitResult.success) {
   console.error('No-split build failed:')
