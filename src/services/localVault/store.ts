@@ -83,7 +83,7 @@ export class LocalVaultValueTooLargeError extends Error {
 // ── Path helpers ──────────────────────────────────────────────────────────────
 
 function getClaudeDir(): string {
-  return process.env['CLAUDE_CONFIG_DIR'] ?? join(homedir(), '.claude')
+  return process.env['CLAUDE_CONFIG_DIR'] ?? join(homedir(), '.ccp')
 }
 
 function getVaultFilePath(): string {

@@ -6,9 +6,9 @@ import { join } from 'path'
 // tests that change the env var get a fresh value without explicit cache.clear.
 export const getClaudeConfigHomeDir = memoize(
   (): string => {
-    return (
-      process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.claude')
-    ).normalize('NFC')
+    return (process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), '.ccp')).normalize(
+      'NFC',
+    )
   },
   () => process.env.CLAUDE_CONFIG_DIR,
 )
