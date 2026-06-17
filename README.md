@@ -25,7 +25,7 @@ curl -fsSL https://bun.sh/install | bash
 git clone https://github.com/GhostDragon124/CC_Pure.git
 cd CC_Pure
 bun install
-bun run build          # 构建到 dist/（split build, ~560 chunks）
+bun run build          # 构建到 dist/（split build, ~586 files）
 ```
 
 ### 配置 API
@@ -77,6 +77,7 @@ CC Pure 基于 CCB v2.6.6 反编译源码，做了以下核心变更：
 
 | 版本 | 日期 | 合并数 | 说明 |
 |------|------|:------:|------|
+| v2.3.0 | 2026-06-04 | 7 commits | **RCS/Web 全量迁移 + SSH Remote**：vanilla JS → React（29 组件 + shadcn/ui），SSH stub 替换为 2029 行完整实现 |
 | v2.2.2 | 2026-06-04 | 16 文件 | **Autonomy 全量合并**：f2e9af49 PR #386 源码 + 11 测试文件，3699 pass |
 | v2.2.1 | 2026-06-04 | 2 | OpenAI fixes backfill：c82f5994 (stop_reason/usage/max_tokens) + 901628b4 (MCP 工具可见性) |
 | v2.2.0 | 2026-06-04 | 2 | Batch 1a 安全加固 + ad09f38f 斜杠补全 |
@@ -85,17 +86,19 @@ CC Pure 基于 CCB v2.6.6 反编译源码，做了以下核心变更：
 | v1.8.0 | 2026-06-04 | 23 | P2 完成 |
 | ... | 2026-06 | 10 | P0/P1 + 基础设施同步 |
 
-> **累计**：180 个候选 commit 全量审查 → ✅ 49 MERGE / 🟡 34 已存在 / ❌ 96 SKIP / ⏸️ 1 延后。
+> **累计**：187 个候选 commit 全量审查 → ✅ 59 MERGE / 🟡 34 已存在 / ❌ 94 SKIP。
 > 详见本地文档 `~/文档/User_manual/CC_Pure_代码分析/CC_Pure_update_record/`。
 
-### 移除的企业全家桶
+### 移除 / 降级的组件
 
-| 移除项 | 原因 |
-|--------|------|
-| Langfuse 监控 | 企业级 Agent 监控，依赖外部 SaaS |
-| Sentry 错误追踪 | 数据上报第三方 |
-| Pipe IPC / LAN Pipes | 多机编排，个人使用不需要 |
-| UDS_INBOX | 进程间通信管道，构建后 Node.js 环境卡死 |
+| 组件 | 状态 | 说明 |
+|------|:---:|------|
+| Sentry 错误追踪 | ❌ 移除 | 数据上报第三方，CCP 无此集成 |
+| Pipe IPC / LAN Pipes | ❌ 禁用 | 多机编排，个人使用不需要 |
+| UDS_INBOX | ❌ 禁用 | 进程间通信管道，Node.js 环境卡死 |
+| Anthropic 遥测上报 | ❌ 阻断 | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` 启动层拦截 |
+| Langfuse 监控 | 🟡 休眠 | 代码保留（`src/services/langfuse/`），配 key 即激活，支持 Docker 自部署 |
+| GrowthBook 远程配置 | 🟡 本地降级 | 1256 行完整客户端，远程不可用时自动使用本地静态默认值 |
 
 ### 遥测：保留源码，默认关闭，本地接管
 
@@ -115,18 +118,30 @@ tail -f ~/.claude/local_analytics.jsonl
 
 ### 保留的核心能力
 
-| Feature | 状态 | 说明 |
-|---------|:---:|------|
-| BRIDGE_MODE | ✅ | WebSocket 远程控制 |
-| DAEMON | ✅ | 守护进程 + 后台 worker |
-| ULTRATHINK | ✅ | 扩展深度推理 |
-| ACP | ⚠️ | 外部 Agent 协议 — stub (fail-closed)，默认关闭 |
-| VOICE_MODE | ✅ | 语音输入 |
-| KAIROS | ✅ | 定时任务系统 |
-| PROACTIVE | ✅ | 自主代理模式 |
-| COORDINATOR_MODE | ✅ | 多 worker 编排 |
-| BG_SESSIONS | ✅ | 后台会话管理 |
-| SSH_REMOTE | ✅ | SSH 远程连接 |
+| 类别 | Feature | 状态 | 说明 |
+|------|---------|:---:|------|
+| **Agent 协议** | ACP | ✅ | 外部 Agent 协议，含 bridge / permissions / session / acp-link manager |
+| **浏览器** | Chrome Use | ✅ | Claude in Chrome 集成，通过浏览器扩展执行操作 |
+| | Computer Use | ✅ | GUI 自动化（截图/点击/输入），`packages/@ant/computer-use-mcp/` |
+| **远程控制** | BRIDGE_MODE | ✅ | Remote Control 私有部署（React Web UI + shadcn/ui 组件库），WebSocket + SSE 实时推送 |
+| | SSH_REMOTE | ✅ | SSH 远程连接（2029行完整实现），本地 REPL + 远端工具执行，SSHSessionManager + SSHProbe + SSHDeploy |
+| **自主代理** | PROACTIVE | ✅ | 主动自主代理模式，SleepTool 控制 tick 节奏 |
+| | DAEMON | ✅ | 守护进程 + 后台 worker |
+| | COORDINATOR_MODE | ✅ | 多 worker 编排 |
+| | BG_SESSIONS | ✅ | 后台会话管理（ps/logs/attach/kill） |
+| **记忆系统** | EXTRACT_MEMORIES | ✅ | /dream 记忆整理 + autoDream 自动蒸馏 |
+| | AWAY_SUMMARY | ✅ | 离线摘要（用户离开后生成总结） |
+| | LODESTONE | ✅ | 上下文锚点，优化长对话的相关性检索 |
+| **推理增强** | ULTRATHINK | ✅ | 超深度思考模式 |
+| | ULTRAPLAN | ✅ | 超级规划模式，深度分析后生成实施计划 |
+| | VERIFICATION_AGENT | ✅ | 任务完成后自动验证 |
+| **工具系统** | TOKEN_BUDGET | ✅ | Token 预算管理与控制 |
+| | PROMPT_CACHE_BREAK_DETECTION | ✅ | Prompt cache 破裂检测 |
+| **输入/摘要** | VOICE_MODE | 🟡 | 代码完整（`src/voice/` + `voiceStreamSTT.ts`），需 Anthropic OAuth 凭证 + GrowthBook kill-switch 放行，CCP 暂无可用方式登录 |
+| | KAIROS_BRIEF | 🟡 | 代码完整，依赖 KAIROS（`isBriefEntitled = feature('KAIROS') || feature('KAIROS_BRIEF')`），KAIROS 本身不可用故绑定休眠 |
+| **定时任务** | KAIROS | 🟡 | 代码完整，运行时需 GrowthBook + OAuth 后端（CCP 暂无） |
+| **可观测性** | Langfuse | 🟡 | 自托管 LLM 追踪（`src/services/langfuse/`），设 `LANGFUSE_PUBLIC_KEY` + `SECRET_KEY` 即激活，支持 Docker 自部署 |
+| **远程配置** | GrowthBook | 🟡 | 1256 行完整客户端，远程不可用时自动降级到本地静态默认值 |
 
 ---
 

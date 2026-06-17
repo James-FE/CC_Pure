@@ -119,7 +119,6 @@ import {
   getAfkModeHeaderLatched,
   getCacheEditingHeaderLatched,
   getFastModeHeaderLatched,
-  getLastApiCompletionTimestamp,
   getPromptCache1hAllowlist,
   getPromptCache1hEligible,
   getSessionId,
@@ -250,7 +249,6 @@ import {
   type NonNullableUsage,
 } from './logging.js'
 import {
-  CACHE_TTL_1HOUR_MS,
   checkResponseForCacheBreak,
   recordPromptState,
 } from './promptCacheBreakDetection.js'
@@ -2320,6 +2318,7 @@ async function* queryModel(
             const m: AssistantMessage = {
               message: {
                 ...partialMessage,
+                usage: partialMessage.usage ?? { ...EMPTY_USAGE },
                 content: normalizeContentFromAPI(
                   [contentBlock] as BetaContentBlock[],
                   tools,

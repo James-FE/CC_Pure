@@ -274,25 +274,31 @@ function getUserSettingsFilePath(): string {
 export function getSettingsFilePathForSource(
   source: SettingSource,
 ): string | undefined {
+  let result: string | undefined
   switch (source) {
     case 'userSettings':
-      return join(
+      result = join(
         getSettingsRootPathForSource(source),
         getUserSettingsFilePath(),
       )
+      break
     case 'projectSettings':
     case 'localSettings': {
-      return join(
+      result = join(
         getSettingsRootPathForSource(source),
         getRelativeSettingsFilePathForSource(source),
       )
+      break
     }
     case 'policySettings':
-      return getManagedSettingsFilePath()
+      result = getManagedSettingsFilePath()
+      break
     case 'flagSettings': {
-      return getFlagSettingsPath()
+      result = getFlagSettingsPath()
+      break
     }
   }
+  return result
 }
 
 export function getRelativeSettingsFilePathForSource(
@@ -745,6 +751,21 @@ function loadSettingsFromDisk(): SettingsWithErrors {
         // Skip if we've already loaded this file from another source
         if (!seenFiles.has(resolvedPath)) {
           seenFiles.add(resolvedPath)
+
+          // Skip project and local settings when they resolve to the user's
+          // claude config directory (~/.claude/). These are not legitimately
+          // separate project-level files — the CWD just happens to be the same
+          // directory as the claude config home. Loading them would let a
+          // local override (e.g. settings.local.json) silently clobber the
+          // user's explicit global settings values.
+          if (
+            (source === 'projectSettings' || source === 'localSettings') &&
+            resolvedPath.startsWith(
+              resolve(getSettingsRootPathForSource('userSettings')),
+            )
+          ) {
+            continue
+          }
 
           const { settings, errors } = parseSettingsFile(filePath)
 

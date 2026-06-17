@@ -35,7 +35,6 @@ import { readFileSync } from 'fs'
 import mapValues from 'lodash-es/mapValues.js'
 import pickBy from 'lodash-es/pickBy.js'
 import uniqBy from 'lodash-es/uniqBy.js'
-import React from 'react'
 import { getOauthConfig } from './constants/oauth.js'
 import { getRemoteSessionUrl } from './constants/product.js'
 import { getSystemContext, getUserContext } from './context.js'
@@ -477,7 +476,7 @@ function logManagedSettings(): void {
 }
 
 // Check if running in debug/inspection mode
-function isBeingDebugged() {
+function _isBeingDebugged() {
 	const isBun = isRunningWithBun();
 
 	// Check for inspect flags in process arguments (including all variants)
@@ -875,6 +874,7 @@ type PendingSSH = {
 	local: boolean;
 	/** Extra CLI args to forward to the remote CLI on initial spawn (--resume, -c). */
 	extraCliArgs: string[];
+	remoteBin: string | undefined;
 };
 const _pendingSSH: PendingSSH | undefined = feature("SSH_REMOTE")
 	? {
@@ -884,6 +884,7 @@ const _pendingSSH: PendingSSH | undefined = feature("SSH_REMOTE")
 			dangerouslySkipPermissions: false,
 			local: false,
 			extraCliArgs: [],
+			remoteBin: undefined,
 		}
 	: undefined;
 
@@ -1090,6 +1091,17 @@ export async function main() {
 					rawCliArgs.splice(eqI, 1);
 				}
 			};
+			const rbIdx = rawCliArgs.indexOf('--remote-bin');
+			if (rbIdx !== -1 && rawCliArgs[rbIdx + 1] && !rawCliArgs[rbIdx + 1]!.startsWith('-')) {
+				_pendingSSH.remoteBin = rawCliArgs[rbIdx + 1];
+				rawCliArgs.splice(rbIdx, 2);
+			}
+			const rbEqIdx = rawCliArgs.findIndex(a => a.startsWith('--remote-bin='));
+			if (rbEqIdx !== -1) {
+				_pendingSSH.remoteBin = rawCliArgs[rbEqIdx]!.split('=').slice(1).join('=');
+				rawCliArgs.splice(rbEqIdx, 1);
+			}
+
 			extractFlag("-c", { as: "--continue" });
 			extractFlag("--continue");
 			extractFlag("--resume", { hasValue: true });
@@ -4647,6 +4659,7 @@ async function run(): Promise<CommanderCommand> {
 								dangerouslySkipPermissions:
 									_pendingSSH.dangerouslySkipPermissions,
 								extraCliArgs: _pendingSSH.extraCliArgs,
+								remoteBin: _pendingSSH.remoteBin,
 							},
 							isTTY
 								? {
@@ -5987,6 +6000,11 @@ async function run(): Promise<CommanderCommand> {
 				"Skip all permission prompts on the remote (dangerous)",
 			)
 			.option(
+				"--remote-bin <command>",
+				"Custom remote binary command (skips probe/deploy). " +
+					"Example: --remote-bin 'bun /path/to/project/dist/cli.js'",
+			)
+			.option(
 				"--local",
 				"e2e test mode — spawn the child CLI locally (skip ssh/deploy). " +
 					"Exercises the auth proxy and unix-socket plumbing without a remote host.",
@@ -7038,3 +7056,4 @@ function extractTeammateOptions(options: unknown): TeammateOptions {
 			typeof opts.agentType === "string" ? opts.agentType : undefined,
 	};
 }
+
