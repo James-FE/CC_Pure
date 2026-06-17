@@ -3155,7 +3155,7 @@ export function REPL({
   const onQueryImpl = useCallback(
     async (
       messagesIncludingNewMessages: MessageType[],
-      _newMessages: MessageType[],      abortController: AbortController,
+      newMessages: MessageType[],      abortController: AbortController,
       shouldQuery: boolean,
       additionalAllowedTools: string[],
       mainLoopModelParam: string,
