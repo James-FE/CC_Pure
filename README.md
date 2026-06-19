@@ -1,17 +1,25 @@
-# CC Pure — 纯净版 Claude Code
+<div align="right">
+  <a href="./README_CN.md">中文</a>
+</div>
+
+# CC Pure — Claude Code Study Edition
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-black?style=flat-square&logo=bun)](https://bun.sh/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)]()
-[![Tests](https://img.shields.io/badge/tests-3699-brightgreen?style=flat-square)]()
-[![Security](https://img.shields.io/badge/CodeQL-0%20open-brightgreen?style=flat-square)]()
+[![Tests](https://img.shields.io/badge/tests-3986-brightgreen?style=flat-square)]()
+[![CodeQL](https://img.shields.io/badge/CodeQL-0%20open%20%C2%B7%2047%20risk%20accepted-yellow?style=flat-square)]()
+[![TypeScript](https://img.shields.io/badge/tsc-0%20errors-brightgreen?style=flat-square)]()
+[![Download](https://img.shields.io/badge/download-latest-blue?style=flat-square)](https://github.com/James-FE/CC_Pure/releases/latest)
 
-> Claude Code 的纯净分叉 —— 去遥测、去企业全家桶、保留核心能力。可审计、可自建、数据主权归你。
+> A clean, independently-maintained study edition. **Telemetry removed. Types fixed. Core capabilities preserved.**
+>
+> **Current (2026-06):** Personality system · Coordinator SQLite blackboard · 0 tsc errors · 0 CodeQL
 
 ---
 
-## ⚡ 快速开始
+## ⚡ Quick Start
 
-### 环境要求
+### Prerequisites
 
 - [Bun](https://bun.sh/) >= 1.3.11
 
@@ -19,179 +27,171 @@
 curl -fsSL https://bun.sh/install | bash
 ```
 
-### 安装
+### Install
 
 ```bash
-git clone https://github.com/GhostDragon124/CC_Pure.git
+# Option 1: Pre-built binary (no build required — Linux arm64/x64)
+curl -L https://github.com/James-FE/CC_Pure/releases/latest/download/ccp-v2.6.11-stable.tar.gz | tar xz
+./dist-nosplit/cli.js --version
+
+# Option 2: Build from source
+git clone https://github.com/James-FE/CC_Pure.git
 cd CC_Pure
 bun install
-bun run build          # 构建到 dist/（split build, ~586 files）
+bun run build          # → dist-nosplit/cli.js (single-file) + dist/ (code-split)
 ```
 
-### 配置 API
+### Configure API
 
 ```bash
-# 方式一：环境变量
-export ANTHROPIC_BASE_URL="https://your-api/v1"
-export ANTHROPIC_API_KEY="sk-xxx"
-
-# 方式二：REPL 内 /login 命令
+# Run CCP once, then type /login in the REPL to configure your model provider.
+# Supports OpenAI (DeepSeek), Anthropic, Gemini, and Grok protocols.
 bun run dev
+# > /login
 ```
 
-### 配置本地快捷命令
+### Verify
 
 ```bash
-# 创建 ccp 命令（一行搞定）
-cat > ~/.local/bin/ccp << 'EOF'
-#!/usr/bin/env bash
-export PATH="$HOME/.bun/bin:$PATH"
-export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
-export DISABLE_TELEMETRY=1
-export NO_PROXY=localhost,127.0.0.1,.local
-exec bun /path/to/CC_Pure/dist-nosplit/cli.js "$@"
-EOF
-chmod +x ~/.local/bin/ccp
-
-# 使用
-ccp -p "hello world"    # pipe 模式
-ccp                     # 交互 REPL
+bun run build && ./dist-nosplit/cli.js --version   # → 2.6.11 (Claude Code)
+echo "1+1" | ccp -p                                 # → 2
 ```
 
-### 验证
+---
+
+## Relationship with Upstream
+
+CC Pure is based on decompiled CCB v2.6.11 sources with these key changes:
+
+### What Was Removed / Downgraded
+
+| Component | Status | Notes |
+|-----------|:------:|-------|
+| Sentry error tracking | ❌ Removed | Third-party data upload |
+| Anthropic telemetry | ❌ Blocked | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` |
+| Langfuse monitoring | 🟡 Dormant | Code preserved (`src/services/langfuse/`), activates with keys |
+| GrowthBook remote config | 🟡 Local fallback | 1,256-line client, auto-falls-back to local defaults |
+
+### What Was Preserved
+
+| Category | Feature | Status |
+|----------|---------|:------:|
+| **Agent Protocol** | ACP (external agent bridge/session/permissions) | ✅ |
+| **Browser** | Chrome Use (GUI automation) | ✅ |
+| | Computer Use (GUI automation) | ❌ disabled¹ |
+| **Remote Control** | BRIDGE_MODE (React Web UI + WebSocket/SSE) | ✅ |
+| | SSH_REMOTE (2,029-line full implementation) | ✅ |
+| **Autonomy** | PROACTIVE + DAEMON + COORDINATOR_MODE | ✅ |
+| | BG_SESSIONS (ps/logs/attach/kill) | ✅ |
+| **Memory** | EXTRACT_MEMORIES + LODESTONE + AWAY_SUMMARY | ✅ |
+| **Reasoning** | ULTRATHINK + ULTRAPLAN + VERIFICATION_AGENT | ✅ |
+| **Tools** | TOKEN_BUDGET + PROMPT_CACHE_BREAK_DETECTION | ✅ |
+| **IPC** | UDS_INBOX + LAN_PIPES (process pipes) | ❌ disabled² |
+| **Voice** | VOICE_MODE | 🟡 Code complete, needs Anthropic OAuth |
+| **Scheduling** | KAIROS / KAIROS_BRIEF | 🟡 Code complete, needs GrowthBook + OAuth backend |
+
+> ¹ **Computer Use** requires macOS accessibility APIs (`SCContentFilter`, `NSWorkspace`). Excluded from no-split build (`build.ts`) — causes "1 MCP server failed" noise on Linux.
+>
+> ² **UDS_INBOX / LAN_PIPES** add a deep import chain (`net`, `dgram`, `crypto`, `child_process`) that blocks cold start in no-split bundles. Excluded from no-split build — split builds lazy-load fine via `dynamic import()`. Code preserved in `src/`, enabled in dev mode.
+
+### Telemetry: Source Preserved, Disabled by Default, Local Sink
+
+Source code (Datadog / GrowthBook / BigQuery / 1P Event Logging) is preserved. All upstream reporting blocked via `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`. A local JSONL sink at `logEvent()` captures 70+ events to `~/.claude/local_analytics.jsonl`.
 
 ```bash
-ccp --version           # 输出: 2.6.5 (Claude Code)
-ccp -p "1+1"            # 输出: 2
+python3 scripts/analyze_analytics.py   # today's event report
+tail -f ~/.claude/local_analytics.jsonl # real-time trace
 ```
 
----
+→ [Claude Code's Light and Shadow: A Telemetry Deep-Dive](docs/Claude_Code_Light_and_Shadow.md)
 
-## 与上游的关系
+### 🤝 Communication System — Structured Blackboard (`blackboard-sourced`)
 
-CC Pure 基于 CCB v2.6.6 反编译源码，做了以下核心变更：
+> **Peer module to Personality system.** The multi-agent communication layer — faster, simpler, and less error-prone than Anthropic's original event sourcing.
+>
+> Full design doc: [`黑板书通信系统设计文档`](docs/communication-system-design.md) (Chinese) | [Evolution log](docs/from-event-sourcing-to-unified-blackboard.md)
 
-### 上游同步策略
+SQLite-backed blackboard with **structured key naming** for compaction-resistant multi-agent coordination. Every state mutation is recorded as both an audit event and a key-value entry in a single transaction — workers write, coordinator reads, janitor cleans.
 
-持续追踪 [Claude Code Best](https://github.com/claude-code-best/claude-code) 上游更新，按安全优先原则选择性合并：
+```
+worker writes → recordEvent() → [events + kv in single SQLite tx]
+coordinator reads → latest state by key → janitor reaps stale entries
+```
 
-| 版本 | 日期 | 合并数 | 说明 |
-|------|------|:------:|------|
-| v2.3.0 | 2026-06-04 | 7 commits | **RCS/Web 全量迁移 + SSH Remote**：vanilla JS → React（29 组件 + shadcn/ui），SSH stub 替换为 2029 行完整实现 |
-| v2.2.2 | 2026-06-04 | 16 文件 | **Autonomy 全量合并**：f2e9af49 PR #386 源码 + 11 测试文件，3699 pass |
-| v2.2.1 | 2026-06-04 | 2 | OpenAI fixes backfill：c82f5994 (stop_reason/usage/max_tokens) + 901628b4 (MCP 工具可见性) |
-| v2.2.0 | 2026-06-04 | 2 | Batch 1a 安全加固 + ad09f38f 斜杠补全 |
-| v2.1.0 | 2026-06-04 | 2 | REVIEW 24 执行完毕 |
-| v2.0.0 | 2026-06-04 | 12 | P3 A 完成 |
-| v1.8.0 | 2026-06-04 | 23 | P2 完成 |
-| ... | 2026-06 | 10 | P0/P1 + 基础设施同步 |
+| Component | File | Purpose |
+|-----------|------|---------|
+| BlackboardStore | `src/blackboard/BlackboardStore.ts` | SQLite CRUD: upsert, prefix query, CAS |
+| KvHelpers | `src/blackboard/kvHelpers.ts` | Structured key builders (`workerKey()`) + parsers (`parseWorkerKey()`) |
+| BlackboardJanitor | `src/blackboard/BlackboardJanitor.ts` | Rule engine: reaps expired keys, cleans orphans, monitors heartbeats |
+| eventRecorder | `src/blackboard/eventRecorder.ts` | `recordEvent()` — single transaction writes both `events` and `kv` tables |
+| RemoteEventStore | `src/coordinator/remoteEventStore.ts` | HTTP client, cross-machine (Phase 2) |
+| HTTP Server | `src/coordinator/eventHttpServer.ts` | Bun.serve:9742, zero deps |
 
-> **累计**：187 个候选 commit 全量审查 → ✅ 59 MERGE / 🟡 34 已存在 / ❌ 94 SKIP。
-> 详见本地文档 `~/文档/User_manual/CC_Pure_代码分析/CC_Pure_update_record/`。
+**Key convention:** `worker:N:status`, `worker:N:result`, `team:sources`, `coordinator:decision`
 
-### 移除 / 降级的组件
-
-| 组件 | 状态 | 说明 |
-|------|:---:|------|
-| Sentry 错误追踪 | ❌ 移除 | 数据上报第三方，CCP 无此集成 |
-| Pipe IPC / LAN Pipes | ❌ 禁用 | 多机编排，个人使用不需要 |
-| UDS_INBOX | ❌ 禁用 | 进程间通信管道，Node.js 环境卡死 |
-| Anthropic 遥测上报 | ❌ 阻断 | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` 启动层拦截 |
-| Langfuse 监控 | 🟡 休眠 | 代码保留（`src/services/langfuse/`），配 key 即激活，支持 Docker 自部署 |
-| GrowthBook 远程配置 | 🟡 本地降级 | 1256 行完整客户端，远程不可用时自动使用本地静态默认值 |
-
-### 遥测：保留源码，默认关闭，本地接管
-
-**源码保留**（Datadog / GrowthBook / BigQuery / 1P Event Logging 全部在代码里），但通过 `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` 在启动层阻断所有上游上报。
-
-同时我们在 `logEvent()` 入口插入了**本地 JSONL sink**，所有 70+ 事件全量写入 `~/.claude/local_analytics.jsonl`。数据主权归你——你可以用自己的分析脚本查看使用统计。
+**Deprecated:** `teamEventStore.ts` (JSONL event log) and `teamProjection.ts` (fold logic) — preserved in `persist/coordinator-event-sourcing` branch for reference.
 
 ```bash
-# 查看今天的事件报告
-python3 scripts/analyze_analytics.py
-
-# 实时追踪
-tail -f ~/.claude/local_analytics.jsonl
+# Run coordinator mode with blackboard
+CLAUDE_CODE_USE_OPENAI=1 bun run dev -- --coordinator
 ```
 
-详见 → [Claude Code 的光明和阴影面（遥测系统深度分析）](docs/Claude_Code_的光明和阴影面.md)
+→ Design: [`EN`](docs/Coordinator_Event_Log_Design_Doc.md) · [`中文`](docs/Coordinator_Event_Log_设计文档.md) · [`Plan`](docs/plans/2026-06-11-coordinator-event-log.md)
 
-### 保留的核心能力
+### Personality Modes (`soul-distilled`)
 
-| 类别 | Feature | 状态 | 说明 |
-|------|---------|:---:|------|
-| **Agent 协议** | ACP | ✅ | 外部 Agent 协议，含 bridge / permissions / session / acp-link manager |
-| **浏览器** | Chrome Use | ✅ | Claude in Chrome 集成，通过浏览器扩展执行操作 |
-| | Computer Use | ✅ | GUI 自动化（截图/点击/输入），`packages/@ant/computer-use-mcp/` |
-| **远程控制** | BRIDGE_MODE | ✅ | Remote Control 私有部署（React Web UI + shadcn/ui 组件库），WebSocket + SSE 实时推送 |
-| | SSH_REMOTE | ✅ | SSH 远程连接（2029行完整实现），本地 REPL + 远端工具执行，SSHSessionManager + SSHProbe + SSHDeploy |
-| **自主代理** | PROACTIVE | ✅ | 主动自主代理模式，SleepTool 控制 tick 节奏 |
-| | DAEMON | ✅ | 守护进程 + 后台 worker |
-| | COORDINATOR_MODE | ✅ | 多 worker 编排 |
-| | BG_SESSIONS | ✅ | 后台会话管理（ps/logs/attach/kill） |
-| **记忆系统** | EXTRACT_MEMORIES | ✅ | /dream 记忆整理 + autoDream 自动蒸馏 |
-| | AWAY_SUMMARY | ✅ | 离线摘要（用户离开后生成总结） |
-| | LODESTONE | ✅ | 上下文锚点，优化长对话的相关性检索 |
-| **推理增强** | ULTRATHINK | ✅ | 超深度思考模式 |
-| | ULTRAPLAN | ✅ | 超级规划模式，深度分析后生成实施计划 |
-| | VERIFICATION_AGENT | ✅ | 任务完成后自动验证 |
-| **工具系统** | TOKEN_BUDGET | ✅ | Token 预算管理与控制 |
-| | PROMPT_CACHE_BREAK_DETECTION | ✅ | Prompt cache 破裂检测 |
-| **输入/摘要** | VOICE_MODE | 🟡 | 代码完整（`src/voice/` + `voiceStreamSTT.ts`），需 Anthropic OAuth 凭证 + GrowthBook kill-switch 放行，CCP 暂无可用方式登录 |
-| | KAIROS_BRIEF | 🟡 | 代码完整，依赖 KAIROS（`isBriefEntitled = feature('KAIROS') || feature('KAIROS_BRIEF')`），KAIROS 本身不可用故绑定休眠 |
-| **定时任务** | KAIROS | 🟡 | 代码完整，运行时需 GrowthBook + OAuth 后端（CCP 暂无） |
-| **可观测性** | Langfuse | 🟡 | 自托管 LLM 追踪（`src/services/langfuse/`），设 `LANGFUSE_PUBLIC_KEY` + `SECRET_KEY` 即激活，支持 Docker 自部署 |
-| **远程配置** | GrowthBook | 🟡 | 1256 行完整客户端，远程不可用时自动降级到本地静态默认值 |
+`/mode` switches between 7 AI personalities — each with dedicated systemPrompt, UI theme, permissions, and response style:
 
----
-
-## 工程质量
-
-| 指标 | CCB 基线 | CC Pure 当前 | 提升 |
-|------|:--------:|:----------:|:----:|
-| tsc 错误 | 62 | **0** | ✅ |
-| 测试通过 | 3007 | **3699** | +692 |
-| 构建 | 不稳定 | **稳定（splitting: true）** | ✅ |
-| 遥测外连 | 有 | **0** | ✅ |
-| CodeQL open | 175+ | **0** | ✅ |
-
-### 安全审计（Phase 0-4，已完成）
-
-四阶段安全审计，175 个 CodeQL 告警全量审查并关闭：
-
-| 阶段 | 范围 | 关键修复 |
-|:----:|------|----------|
-| 0 | 基线建立 | 降级查询套件，过滤反编译噪音 |
-| 1 | 隐私泄露 | 凭证脱敏、RCS 默认绑 127.0.0.1 |
-| 2 | 结构对齐 | 删除 `src/tools/` 去重，修复 BashTool/AgentTool 回归 |
-| 3 | 漏洞修复 | shell 注入、URL 解析、HTML 过滤 |
-| 4 | 残余告警 | 命令注入（which）、ReDoS、净化绕过 |
-
-**全部 175 个告警经人工审查后关闭**：误报（PKCE SHA-256、execa 数组 args）、feature-gated 代码、或预期行为。详见 [SECURITY.md](SECURITY.md)。
-
----
-
-## 本地开发
+| Mode | Icon | Description | Persona |
+|------|:----:|-------------|:-------:|
+| **Claude** | 🎭 | Authentic Claude persona — distilled from leaked 70KB Soul Document | 2,848 chars |
+| Default | ⚡ | Balanced, everyday development | — |
+| Gentle | 🌸 | Patient, educational | 231 chars |
+| Dr. Sharp | 🔍 | Rigorous 3-step code review | 1,845 chars |
+| Workhorse | 🐴 | Auto-execute, fewer confirmations | 203 chars |
+| Token Saver | 💰 | Minimal replies, save tokens | 165 chars |
+| Super AI | 🧠 | Deep thinking, comprehensive analysis | 266 chars |
 
 ```bash
-bun install
-bun run dev           # 开发模式（默认全 feature 开启）
-bun run build         # 生产构建
-bun test              # 3699 tests
+/mode               # interactive picker
+/mode claude        # switch directly to Claude persona
+/mode sharp         # switch to code review mode
 ```
 
----
+**Custom modes:** Drop a YAML file in `~/.claude/modes/` — auto-loaded alongside built-ins.
 
-## ⚠️ 免责声明
-
-1. **本项目仅供学习研究用途。** Claude Code 的所有权利归 [Anthropic](https://www.anthropic.com/) 所有。
-2. **非 CCB 官方发布。** CC Pure 是个人维护的纯净分叉，未经 CCB 团队审核或认可。
-3. **不提供任何保证。** 使用本软件即表示您自行承担风险。
-4. **API 使用合规。** 使用第三方 API 需遵守相应服务商条款。本项目不提供任何 API 密钥。
+→ [CCP Claude Persona SWE-bench Lite Report (v2)](docs/ccp-claude-persona-swebench-report-v2-en.md) — cross-tool zero-migration. 90 instances: **+11pp** (68.6% vs 57.5%)
 
 ---
 
-## 致谢
+## Engineering Quality
 
-- [Claude Code Best](https://github.com/claude-code-best/claude-code) — 逆向工程和开源的基础
-- [Anthropic](https://www.anthropic.com/) — Claude Code 原作者
+| Metric | CCB Baseline | CC Pure | Improvement |
+|--------|:------------:|:-------:|:-----------:|
+| tsc errors | 62 | **0** | All decompilation artifacts cleared |
+| Tests passing | 3,007 | **3,986** | +979 |
+| Build | Unstable | **Stable (splitting: true)** | ✅ |
+| Telemetry egress | Yes | **0** | ✅ |
+| CodeQL open | 175+ | **0** | 254 fixed · 260 dismissed |
+| `as any` (core) | 94 | **0** | ✅ |
+
+### Related Documentation
+
+- **DeepWiki**: [deepwiki.com/claude-code-best/claude-code](https://deepwiki.com/claude-code-best/claude-code)
+
+---
+
+## ⚠️ Disclaimer
+
+1. **Research and educational use only.** All rights to Claude Code belong to [Anthropic](https://www.anthropic.com/).
+2. **Not an official CCB release.** CC Pure is a personally-maintained clean fork, not reviewed or endorsed by the CCB team.
+3. **No warranty.** Use this software at your own risk.
+4. **API compliance.** Using third-party APIs requires compliance with the respective provider's terms. This project does not provide any API keys.
+
+---
+
+## Acknowledgements
+
+- [James-FE](https://github.com/James-FE) — Maintainer
+- [Claude Code Best](https://github.com/claude-code-best/claude-code) — Reverse engineering & open-source foundation
+- [Anthropic](https://www.anthropic.com/) — Original author of Claude Code
