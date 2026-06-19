@@ -83,10 +83,14 @@ export async function setup(
     switchSession(asSessionId(customSessionId))
   }
 
-  // --bare / SIMPLE: skip UDS messaging server and teammate snapshot.
-  // Scripted calls don't receive injected messages and don't use swarm teammates.
+  // --bare / SIMPLE and print mode skip UDS messaging server and teammate snapshot.
+  // Non-interactive print mode doesn't receive injected messages through this
+  // server path; starting it can block pipe mode before runHeadless().
   // Explicit --messaging-socket-path is the escape hatch (per #23222 gate pattern).
-  if (!isBareMode() || messagingSocketPath !== undefined) {
+  if (
+    (!isBareMode() && !getIsNonInteractiveSession()) ||
+    messagingSocketPath !== undefined
+  ) {
     // Start UDS messaging server (Mac/Linux only).
     // Enabled by default for ants — creates a socket in tmpdir if no
     // --messaging-socket-path is passed. Awaited so the server is bound
