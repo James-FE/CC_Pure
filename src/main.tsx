@@ -22,7 +22,6 @@ import { ensureKeychainPrefetchCompleted, startKeychainPrefetch } from './utils/
 startKeychainPrefetch();
 
 import { feature } from 'bun:bundle';
-import { createRequire } from 'node:module';
 import { Command as CommanderCommand, InvalidArgumentError, Option } from '@commander-js/extra-typings';
 import chalk from 'chalk';
 import { readFileSync } from 'fs';
@@ -32,7 +31,6 @@ import uniqBy from 'lodash-es/uniqBy.js';
 import { getOauthConfig } from './constants/oauth.js';
 import { getRemoteSessionUrl } from './constants/product.js';
 
-const require = createRequire(import.meta.url);
 import { getSystemContext, getUserContext } from './context.js';
 import { init, initializeTelemetryAfterTrust } from './entrypoints/init.js';
 import { addToHistory } from './history.js';
