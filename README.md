@@ -30,15 +30,15 @@ curl -fsSL https://bun.sh/install | bash
 ### Install
 
 ```bash
-# Option 1: Pre-built (no build required — macOS & Linux)
-curl -L https://github.com/James-FE/CC_Pure/releases/latest/download/ccp-v2.6.11.tar.gz | tar xz
-cd dist-nosplit && bun cli.js --version
+# Option 1: Pre-built binary (no build required — Linux arm64/x64)
+curl -L https://github.com/James-FE/CC_Pure/releases/latest/download/ccp-v2.6.11-stable.tar.gz | tar xz
+./dist-nosplit/cli.js --version
 
 # Option 2: Build from source
 git clone https://github.com/James-FE/CC_Pure.git
 cd CC_Pure
 bun install
-bun run build
+bun run build          # → dist-nosplit/cli.js (single-file) + dist/ (code-split)
 ```
 
 ### Configure API
@@ -53,8 +53,8 @@ bun run dev
 ### Verify
 
 ```bash
-ccp --version           # → 2.6.11 (Claude Code)
-ccp -p "1+1"            # → 2
+bun run build && ./dist-nosplit/cli.js --version   # → 2.6.11 (Claude Code)
+echo "1+1" | ccp -p                                 # → 2
 ```
 
 ---
@@ -77,7 +77,8 @@ CC Pure is based on decompiled CCB v2.6.11 sources with these key changes:
 | Category | Feature | Status |
 |----------|---------|:------:|
 | **Agent Protocol** | ACP (external agent bridge/session/permissions) | ✅ |
-| **Browser** | Chrome Use + Computer Use (GUI automation) | ✅ |
+| **Browser** | Chrome Use (GUI automation) | ✅ |
+| | Computer Use (GUI automation) | ❌ disabled¹ |
 | **Remote Control** | BRIDGE_MODE (React Web UI + WebSocket/SSE) | ✅ |
 | | SSH_REMOTE (2,029-line full implementation) | ✅ |
 | **Autonomy** | PROACTIVE + DAEMON + COORDINATOR_MODE | ✅ |
@@ -85,8 +86,13 @@ CC Pure is based on decompiled CCB v2.6.11 sources with these key changes:
 | **Memory** | EXTRACT_MEMORIES + LODESTONE + AWAY_SUMMARY | ✅ |
 | **Reasoning** | ULTRATHINK + ULTRAPLAN + VERIFICATION_AGENT | ✅ |
 | **Tools** | TOKEN_BUDGET + PROMPT_CACHE_BREAK_DETECTION | ✅ |
+| **IPC** | UDS_INBOX + LAN_PIPES (process pipes) | ❌ disabled² |
 | **Voice** | VOICE_MODE | 🟡 Code complete, needs Anthropic OAuth |
 | **Scheduling** | KAIROS / KAIROS_BRIEF | 🟡 Code complete, needs GrowthBook + OAuth backend |
+
+> ¹ **Computer Use** requires macOS accessibility APIs (`SCContentFilter`, `NSWorkspace`). Excluded from no-split build (`build.ts`) — causes "1 MCP server failed" noise on Linux.
+>
+> ² **UDS_INBOX / LAN_PIPES** add a deep import chain (`net`, `dgram`, `crypto`, `child_process`) that blocks cold start in no-split bundles. Excluded from no-split build — split builds lazy-load fine via `dynamic import()`. Code preserved in `src/`, enabled in dev mode.
 
 ### Telemetry: Source Preserved, Disabled by Default, Local Sink
 
