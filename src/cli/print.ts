@@ -474,6 +474,7 @@ export async function runHeadless(
     teleport: string | true | null | undefined
     sdkUrl: string | undefined
     replayUserMessages: boolean | undefined
+    messagingSocketPath: string | undefined
     includePartialMessages: boolean | undefined
     forkSession: boolean | undefined
     rewindFiles: string | undefined
@@ -992,6 +993,7 @@ function runHeadlessStreaming(
     userSpecifiedModel: string | undefined
     fallbackModel: string | undefined
     replayUserMessages?: boolean | undefined
+    messagingSocketPath?: string | undefined
     includePartialMessages?: boolean | undefined
     enableAuthStatus?: boolean | undefined
     agent?: string | undefined
@@ -1830,6 +1832,7 @@ function runHeadlessStreaming(
       currentCommands = newCommands
     })
   })
+  let unsubscribeUdsInboxQueueKick: (() => void) | undefined
 
   // Proactive mode: schedule a tick to keep the model looping autonomously.
   // setTimeout(0) yields to the event loop so pending stdin messages
@@ -2683,6 +2686,7 @@ function runHeadlessStreaming(
         suggestionState.abortController = null
         await finalizePendingAsyncHooks()
         unsubscribeSkillChanges()
+        unsubscribeUdsInboxQueueKick?.()
         unsubscribeAuthStatus?.()
         statusListeners.delete(rateLimitListener)
         output.done()
@@ -2692,15 +2696,17 @@ function runHeadlessStreaming(
 
   // Set up UDS inbox callback so the query loop is kicked off
   // when a message arrives via the UDS socket in headless mode.
+  // Normal pipe mode does not start a UDS server, so it must not load UDS
+  // plumbing here. The explicit socket-path escape hatch only needs a queue
+  // kick when another path enqueues an injected message.
   if (feature('UDS_INBOX')) {
-    /* eslint-disable @typescript-eslint/no-require-imports */
-    const { setOnEnqueue } = require('../utils/udsMessaging.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
-    setOnEnqueue(() => {
-      if (!inputClosed) {
-        void run()
-      }
-    })
+    if (options.messagingSocketPath !== undefined) {
+      unsubscribeUdsInboxQueueKick = subscribeToCommandQueue(() => {
+        if (!inputClosed) {
+          void run()
+        }
+      })
+    }
   }
 
   // Cron scheduler: runs scheduled_tasks.json tasks in SDK/-p mode.
@@ -4166,6 +4172,7 @@ function runHeadlessStreaming(
       suggestionState.abortController = null
       await finalizePendingAsyncHooks()
       unsubscribeSkillChanges()
+      unsubscribeUdsInboxQueueKick?.()
       unsubscribeAuthStatus?.()
       statusListeners.delete(rateLimitListener)
       output.done()

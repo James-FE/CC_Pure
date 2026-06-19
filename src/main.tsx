@@ -3349,6 +3349,7 @@ async function run(): Promise<CommanderCommand> {
             teleport,
             sdkUrl,
             replayUserMessages: effectiveReplayUserMessages,
+            messagingSocketPath,
             includePartialMessages: effectiveIncludePartialMessages,
             forkSession: options.forkSession || false,
             resumeSessionAt: options.resumeSessionAt || undefined,
