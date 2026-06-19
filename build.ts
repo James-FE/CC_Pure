@@ -101,7 +101,12 @@ if (!rgScript.success) {
 // UDS_INBOX adds a deep import chain (net, dgram, crypto, child_process)
 // that blocks cold start in non-split bundles. Split builds lazy-load fine
 // via dynamic import() — see replLauncher.tsx.
-const noSplitFeatures = features.filter(f => f !== 'UDS_INBOX')
+// CHICAGO_MCP (Computer Use) requires macOS accessibility APIs
+// (SCContentFilter, NSWorkspace). On Linux it registers a stdio MCP server
+// that always fails → "1 MCP server failed" noise in the status bar.
+const noSplitFeatures = features.filter(
+  f => f !== 'UDS_INBOX' && f !== 'CHICAGO_MCP',
+)
 
 const noSplitDir = 'dist-nosplit'
 rmSync(noSplitDir, { recursive: true, force: true })
