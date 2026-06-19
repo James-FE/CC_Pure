@@ -31,7 +31,7 @@ curl -fsSL https://bun.sh/install | bash
 
 ```bash
 # Option 1: Pre-built binary (no build required — Linux arm64/x64)
-curl -L https://github.com/James-FE/CC_Pure/releases/latest/download/ccp-v2.6.11-stable.tar.gz | tar xz
+curl -L https://github.com/James-FE/CC_Pure/releases/latest/download/ccp-v2.6.11-stable.2.tar.gz | tar xz
 ./dist-nosplit/cli.js --version
 
 # Option 2: Build from source
@@ -86,13 +86,13 @@ CC Pure is based on decompiled CCB v2.6.11 sources with these key changes:
 | **Memory** | EXTRACT_MEMORIES + LODESTONE + AWAY_SUMMARY | ✅ |
 | **Reasoning** | ULTRATHINK + ULTRAPLAN + VERIFICATION_AGENT | ✅ |
 | **Tools** | TOKEN_BUDGET + PROMPT_CACHE_BREAK_DETECTION | ✅ |
-| **IPC** | UDS_INBOX + LAN_PIPES (process pipes) | ❌ disabled² |
+| **IPC** | UDS_INBOX + LAN_PIPES (process pipes) | ✅ enabled |
 | **Voice** | VOICE_MODE | 🟡 Code complete, needs Anthropic OAuth |
 | **Scheduling** | KAIROS / KAIROS_BRIEF | 🟡 Code complete, needs GrowthBook + OAuth backend |
 
 > ¹ **Computer Use** requires macOS accessibility APIs (`SCContentFilter`, `NSWorkspace`). Excluded from no-split build (`build.ts`) — causes "1 MCP server failed" noise on Linux.
 >
-> ² **UDS_INBOX / LAN_PIPES** add a deep import chain (`net`, `dgram`, `crypto`, `child_process`) that blocks cold start in no-split bundles. Excluded from no-split build — split builds lazy-load fine via `dynamic import()`. Code preserved in `src/`, enabled in dev mode.
+> ² **UDS_INBOX / LAN_PIPES** — Now fully enabled. Cold-start hang resolved: `setup.ts` gates startup in pipe mode (`!getIsNonInteractiveSession()`), and `udsMessaging` is lazily loaded via `await import()` in print mode. Both interactive and pipe modes verified stable.
 
 ### Telemetry: Source Preserved, Disabled by Default, Local Sink
 
