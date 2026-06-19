@@ -104,9 +104,7 @@ if (!rgScript.success) {
 // CHICAGO_MCP (Computer Use) requires macOS accessibility APIs
 // (SCContentFilter, NSWorkspace). On Linux it registers a stdio MCP server
 // that always fails → "1 MCP server failed" noise in the status bar.
-const noSplitFeatures = features.filter(
-  f => f !== 'UDS_INBOX' && f !== 'CHICAGO_MCP',
-)
+const noSplitFeatures = features.filter(f => f !== 'CHICAGO_MCP')
 
 const noSplitDir = 'dist-nosplit'
 rmSync(noSplitDir, { recursive: true, force: true })
