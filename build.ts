@@ -83,7 +83,16 @@ if (!rgScript.success) {
 
 // Step 6: Build no-split single-file bundle for `ccb` CLI
 // Code-split build hangs on chunk lazy-loading with Bun 1.3.11,
-// so we provide a no-split alternative for the `ccb` launcher.
+// so we provide a no-split alternative for the CLI launcher.
+// UDS_INBOX adds a deep import chain (net, dgram, crypto, child_process)
+// that blocks cold start in non-split bundles. Split builds lazy-load fine
+// via dynamic import() — see replLauncher.tsx.
+// CHICAGO_MCP (Computer Use) requires macOS accessibility APIs
+// (SCContentFilter, NSWorkspace). On Linux it registers a stdio MCP server
+// that always fails → "1 MCP server failed" noise in the status bar.
+const noSplitFeatures = features.filter(
+  f => f !== 'UDS_INBOX' && f !== 'CHICAGO_MCP',
+)
 const noSplitDir = 'dist-nosplit'
 rmSync(noSplitDir, { recursive: true, force: true })
 const noSplitResult = await Bun.build({
