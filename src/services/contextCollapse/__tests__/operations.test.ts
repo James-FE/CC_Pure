@@ -125,7 +125,7 @@ describe('projectView', () => {
     expect(projected).toHaveLength(3)
     expect(projected[0]).toBe(messages[0])
     expect(projected[1]?.message?.content).toBe(
-      '[Collapsed 2 messages]\n\nrestored summary',
+      '<collapsed id="collapse">restored summary</collapsed>',
     )
     expect(projected[2]).toBe(messages[3])
   })

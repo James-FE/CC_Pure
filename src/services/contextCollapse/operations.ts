@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto'
+import { randomUUID, type UUID } from 'crypto'
 import type { ContextCollapseCommitEntry } from 'src/types/logs.js'
 import type { Message } from 'src/types/message.js'
 import { getRestoredCommits } from './persist.js'
@@ -15,6 +15,16 @@ export type CollapseStrategy = 'llm-summary' | 'truncate' | 'sliding-window'
 export type CollapseEntry = {
   /** Unique identifier for this collapse */
   id: string
+  /**
+   * UUID of the summary placeholder message. Optional — explicit CollapseEntry[]
+   * callers don't provide it; createSummaryMessage falls back to randomUUID().
+   */
+  summaryUuid?: string
+  /**
+   * Verbatim placeholder body: <collapsed id="...">text</collapsed>.
+   * Optional — explicit callers don't provide it; falls back to stub template.
+   */
+  summaryContent?: string
   /** Which messages were collapsed */
   span: {
     /** First message index in the original sequence (inclusive) */
@@ -58,10 +68,12 @@ export type CollapseEntry = {
 export function createSummaryMessage(entry: CollapseEntry): Message {
   return {
     type: 'user',
-    uuid: randomUUID(),
+    uuid: (entry.summaryUuid ?? randomUUID()) as UUID,
     message: {
       role: 'user',
-      content: `[Collapsed ${entry.meta.messageCount} messages]\n\n${entry.replacement.text}`,
+      content:
+        entry.summaryContent ??
+        `[Collapsed ${entry.meta.messageCount} messages]\n\n${entry.replacement.text}`,
     },
     timestamp: entry.createdAt,
     isSidechain: true,
@@ -119,6 +131,8 @@ function commitToSpan(
 
   return {
     id: commit.collapseId,
+    summaryUuid: commit.summaryUuid,
+    summaryContent: commit.summaryContent,
     span: {
       startIdx,
       endIdx,
