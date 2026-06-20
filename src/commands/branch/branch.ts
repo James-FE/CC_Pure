@@ -23,6 +23,10 @@ import {
 import { jsonStringify } from '../../utils/slowOperations.js'
 import { escapeRegExp } from '../../utils/stringUtils.js'
 
+type UserMessage = SerializedMessage & {
+  message: NonNullable<SerializedMessage['message']>
+}
+
 type TranscriptEntry = TranscriptMessage & {
   forkedFrom?: {
     sessionId: string
@@ -36,9 +40,9 @@ type TranscriptEntry = TranscriptMessage & {
  * otherwise flow into the saved title and break the resume hint.
  */
 export function deriveFirstPrompt(
-  firstUserMessage: Extract<SerializedMessage, { type: 'user' }> | undefined,
+  firstUserMessage: UserMessage | undefined,
 ): string {
-  const content = (firstUserMessage as any)?.message?.content
+  const content = firstUserMessage?.message?.content
   if (!content) return 'Branched conversation'
   const raw =
     typeof content === 'string'
