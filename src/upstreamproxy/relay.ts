@@ -40,11 +40,12 @@ type WebSocketLike = Pick<
   | 'onmessage'
   | 'onerror'
   | 'onclose'
-  | 'send'
   | 'close'
   | 'readyState'
   | 'binaryType'
->
+> & {
+  send(data: string | Uint8Array): void
+}
 
 // Envoy per-request buffer cap. Week-1 Datadog payloads won't hit this, but
 // design for it so git-push doesn't need a relay rewrite.
@@ -370,7 +371,7 @@ function openTunnel(
       headers,
       proxy: getWebSocketProxyUrl(wsUrl),
       tls: getWebSocketTLSOptions() || undefined,
-    })
+    }) as unknown as WebSocketLike
   }
   ws.binaryType = 'arraybuffer'
   st.ws = ws
@@ -381,7 +382,7 @@ function openTunnel(
     // responds with its own "HTTP/1.1 200" over the tunnel; we just pipe it.
     const head =
       `${connectLine}\r\n` + `Proxy-Authorization: ${authHeader}\r\n` + `\r\n`
-    ws.send(encodeChunk(new Uint8Array(Buffer.from(head, 'utf8'))) as any)
+    ws.send(encodeChunk(new Uint8Array(Buffer.from(head, 'utf8'))))
     // Flush anything that arrived while the WS handshake was in flight —
     // trailing bytes from the CONNECT packet and any data() callbacks that
     // fired before onopen.
@@ -429,7 +430,7 @@ function openTunnel(
 
 function sendKeepalive(ws: WebSocketLike): void {
   if (ws.readyState === WebSocket.OPEN) {
-    ws.send(encodeChunk(new Uint8Array(0)) as any)
+    ws.send(encodeChunk(new Uint8Array(0)))
   }
 }
 
@@ -437,7 +438,7 @@ function forwardToWs(ws: WebSocketLike, data: Buffer): void {
   if (ws.readyState !== WebSocket.OPEN) return
   for (let off = 0; off < data.length; off += MAX_CHUNK_BYTES) {
     const slice = new Uint8Array(data.subarray(off, off + MAX_CHUNK_BYTES))
-    ws.send(encodeChunk(slice) as any)
+    ws.send(encodeChunk(slice))
   }
 }
 
