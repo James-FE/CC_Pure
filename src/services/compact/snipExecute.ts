@@ -32,40 +32,10 @@ type TextBlock = {
 export async function executeSnip(
   args: SnipExecuteArgs,
 ): Promise<Message | undefined> {
-  const removedMessages: Message[] = []
-  const exchanges = groupExchanges(args.store)
-
-  for (const messageId of args.messageIds) {
-    const exchange = exchanges.find(candidate =>
-      candidate.some(message => message.uuid === messageId),
-    )
-    if (exchange) {
-      removedMessages.push(...exchange)
-      continue
-    }
-
-    const msg = args.store.find(m => m.uuid === messageId)
-    if (msg) removedMessages.push(msg)
-  }
-
-  const closedRemovedMessages = closeToolPairs(removedMessages, args.store)
-  const removedUuids = closedRemovedMessages.map(message =>
-    String(message.uuid),
-  )
+  const { closedRemovedMessages, removedUuids } = collectSnipTargets(args)
 
   if (removedUuids.length === 0) {
-    const missingMessageIds = args.messageIds
-    return {
-      type: 'system',
-      uuid: randomUUID(),
-      subtype: 'snip_failed',
-      missingMessageIds,
-      message: {
-        role: 'system',
-        content: `Snip failed: no requested message IDs were found: ${missingMessageIds.join(', ')}`,
-      },
-      timestamp: new Date().toISOString(),
-    } as Message
+    return createSnipFailedNotice(args.messageIds)
   }
 
   let removedTokens = 0
@@ -128,6 +98,74 @@ export async function executeSnip(
     summary,
     messageCount: removedUuids.length,
     tokenCount: removedTokens,
+    timestamp: new Date().toISOString(),
+  } as Message
+}
+
+export function produceSnipMarker(args: SnipExecuteArgs): Message | undefined {
+  const { closedRemovedMessages, removedUuids } = collectSnipTargets(args)
+
+  if (removedUuids.length === 0) {
+    return createSnipFailedNotice(args.messageIds)
+  }
+
+  let estimatedTokens = 0
+  for (const message of closedRemovedMessages) {
+    estimatedTokens += estimateMessageTokens(message)
+  }
+
+  return {
+    type: 'system',
+    uuid: randomUUID(),
+    subtype: 'snip_marker',
+    markedUuids: removedUuids,
+    estimatedTokens,
+    timestamp: new Date().toISOString(),
+    message: {
+      role: 'system',
+      content: `Snip marker: ${removedUuids.length} messages folded (~${estimatedTokens} tokens).`,
+    },
+  } as Message
+}
+
+function collectSnipTargets(args: SnipExecuteArgs): {
+  closedRemovedMessages: Message[]
+  removedUuids: string[]
+} {
+  const removedMessages: Message[] = []
+  const exchanges = groupExchanges(args.store)
+
+  for (const messageId of args.messageIds) {
+    const exchange = exchanges.find(candidate =>
+      candidate.some(message => message.uuid === messageId),
+    )
+    if (exchange) {
+      removedMessages.push(...exchange)
+      continue
+    }
+
+    const msg = args.store.find(m => m.uuid === messageId)
+    if (msg) removedMessages.push(msg)
+  }
+
+  const closedRemovedMessages = closeToolPairs(removedMessages, args.store)
+  const removedUuids = closedRemovedMessages.map(message =>
+    String(message.uuid),
+  )
+
+  return { closedRemovedMessages, removedUuids }
+}
+
+function createSnipFailedNotice(missingMessageIds: string[]): Message {
+  return {
+    type: 'system',
+    uuid: randomUUID(),
+    subtype: 'snip_failed',
+    missingMessageIds,
+    message: {
+      role: 'system',
+      content: `Snip failed: no requested message IDs were found: ${missingMessageIds.join(', ')}`,
+    },
     timestamp: new Date().toISOString(),
   } as Message
 }

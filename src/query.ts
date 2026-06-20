@@ -612,6 +612,21 @@ async function* queryLoop(
       if (snipResult.boundaryMessage) {
         yield snipResult.boundaryMessage
       }
+      const markerResult = await snipModule!.resolveSnipMarkersIfNeeded(
+        messagesForQuery,
+        toolUseContext.abortController.signal,
+        {
+          systemPrompt: [],
+          maxTokens: 512,
+        },
+      )
+      if (markerResult.executed) {
+        messagesForQuery = markerResult.messages
+        snipTokensFreed += markerResult.tokensFreed
+        for (const boundaryMessage of markerResult.boundaryMessages) {
+          yield boundaryMessage
+        }
+      }
       queryCheckpoint('query_snip_end')
     }
 
@@ -1656,7 +1671,7 @@ async function* queryLoop(
       ? streamingToolExecutor.getRemainingResults()
       : runTools(toolUseBlocks, assistantMessages, canUseTool, toolUseContext)
 
-    const snipBoundaryMessages: Message[] = []
+    const snipGeneratedMessages: Message[] = []
 
     for await (const update of toolUpdates) {
       if (update.message) {
@@ -1678,23 +1693,35 @@ async function* queryLoop(
 
         if (feature('HISTORY_SNIP') && snipModule) {
           for (const toolResultMessage of normalizedToolResults) {
-            const boundary = await snipModule.maybeExecuteSnipFromToolResult(
+            const request = snipModule.extractSnipRequestFromToolResult(
               toolResultMessage,
               [
                 ...messagesForQuery,
                 ...assistantMessages,
                 ...toolResults,
-                ...snipBoundaryMessages,
+                ...snipGeneratedMessages,
               ],
-              toolUseContext.abortController.signal,
-              {
+            )
+            if (!request) continue
+
+            const marker = snipModule.produceSnipMarker({
+              messageIds: request.messageIds,
+              reason: request.reason,
+              store: [
+                ...messagesForQuery,
+                ...assistantMessages,
+                ...toolResults,
+                ...snipGeneratedMessages,
+              ],
+              signal: toolUseContext.abortController.signal,
+              haikuOptions: {
                 systemPrompt: [],
                 maxTokens: 512,
               },
-            )
-            if (boundary) {
-              yield boundary
-              snipBoundaryMessages.push(boundary)
+            })
+            if (marker) {
+              yield marker
+              snipGeneratedMessages.push(marker)
             }
           }
         }
@@ -2023,7 +2050,7 @@ async function* queryLoop(
             ...messagesForQuery,
             ...assistantMessages,
             ...toolResults,
-            ...snipBoundaryMessages,
+            ...snipGeneratedMessages,
           ],
         })
       }
@@ -2045,7 +2072,7 @@ async function* queryLoop(
         ...messagesForQuery,
         ...assistantMessages,
         ...toolResults,
-        ...snipBoundaryMessages,
+        ...snipGeneratedMessages,
       ],
       toolUseContext: toolUseContextWithQueryTracking,
       autoCompactTracking: tracking,

@@ -10,7 +10,7 @@ import type {
 import * as React from 'react';
 import type { Command } from '../commands.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
-import { Box } from '@anthropic/ink';
+import { Box, Text } from '@anthropic/ink';
 import type { Tools } from '../Tool.js';
 import { type ConnectorTextBlock, isConnectorTextBlock } from '../types/connectorText.js';
 import type {
@@ -213,9 +213,15 @@ function MessageImpl({
           return <SnipBoundaryMessage message={message} />;
         }
         if (isSnipMarkerMessage(message)) {
-          // Internal registration marker — not user-facing. The boundary
-          // message (above) is what shows when snips actually execute.
-          return null;
+          const markedUuids = (message as { markedUuids?: unknown }).markedUuids;
+          const estimatedTokens = (message as { estimatedTokens?: unknown }).estimatedTokens;
+          const messageCount = Array.isArray(markedUuids) ? markedUuids.length : 0;
+          const tokenCount = typeof estimatedTokens === 'number' ? estimatedTokens : '?';
+          return (
+            <Box marginLeft={2}>
+              <Text dimColor>{`⌟ ${messageCount} messages folded (~${tokenCount} tokens) — pending summary`}</Text>
+            </Box>
+          );
         }
       }
       if (message.subtype === 'local_command') {

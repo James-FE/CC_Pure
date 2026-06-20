@@ -1,10 +1,11 @@
 import { randomUUID } from 'crypto'
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, mock, test } from 'bun:test'
 import type { UUID } from 'crypto'
 import type { Message } from 'src/types/message.js'
 import {
   estimateMessageTokens,
   findSnipBoundary,
+  resolveSnipMarkersIfNeeded,
   snipCompactIfNeeded,
 } from '../snipCompact.js'
 
@@ -22,6 +23,17 @@ function makeBoundary(removedUuids: string[]): Message {
     uuid: randomUUID() as UUID,
     subtype: 'snip_boundary',
     snipMetadata: { removedUuids },
+  }
+}
+
+function makeMarker(markedUuids: string[], estimatedTokens: number): Message {
+  return {
+    type: 'system',
+    uuid: randomUUID() as UUID,
+    subtype: 'snip_marker',
+    markedUuids,
+    estimatedTokens,
+    timestamp: '2026-06-20T00:00:00.000Z',
   }
 }
 
@@ -119,5 +131,38 @@ describe('snipCompactIfNeeded', () => {
 
     expect(compacted.executed).toBe(true)
     expect(compacted.messages).toEqual([user, boundary, nextUser])
+  })
+})
+
+describe('resolveSnipMarkersIfNeeded', () => {
+  test('turns pending snip markers into boundaries and removes marked messages', async () => {
+    const remove = makeMessage('old context '.repeat(100), 'user')
+    const keep = makeMessage('keep me', 'user')
+    const marker = makeMarker([remove.uuid], 300)
+    const queryHaiku = mock(async () => ({
+      message: {
+        content: [{ type: 'text', text: 'Resolved marker summary' }],
+      },
+    }))
+    mock.module('src/services/api/claude.js', () => ({ queryHaiku }))
+
+    const compacted = await resolveSnipMarkersIfNeeded(
+      [remove, marker, keep],
+      new AbortController().signal,
+      { systemPrompt: [], maxTokens: 512 },
+    )
+
+    expect(compacted.executed).toBe(true)
+    expect(compacted.messages.map(message => message.uuid)).toEqual([
+      keep.uuid,
+      compacted.boundaryMessages[0]?.uuid,
+    ])
+    expect(compacted.boundaryMessages[0]).toMatchObject({
+      type: 'system',
+      subtype: 'snip_boundary',
+      summary: 'Resolved marker summary',
+      snipMetadata: { removedUuids: [remove.uuid] },
+    })
+    expect(queryHaiku).toHaveBeenCalledTimes(1)
   })
 })

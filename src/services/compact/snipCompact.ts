@@ -1,6 +1,16 @@
 import type { Message } from 'src/types/message.js'
 import { closeToolPairs, type SnipExecuteArgs } from './snipExecute.js'
 
+export { produceSnipMarker } from './snipExecute.js'
+
+export type SnipCompactResult = {
+  messages: Message[]
+  executed: boolean
+  tokensFreed: number
+  boundaryMessage?: Message
+  boundaryMessages: Message[]
+}
+
 /**
  * Estimated characters per token (conservative for mixed code/text).
  */
@@ -166,6 +176,88 @@ export function snipCompactIfNeeded(
   }
 }
 
+export async function resolveSnipMarkersIfNeeded(
+  messages: Message[],
+  signal: AbortSignal,
+  haikuOptions: SnipExecuteArgs['haikuOptions'],
+): Promise<SnipCompactResult> {
+  const markers = findSnipMarkers(messages)
+
+  if (markers.length === 0) {
+    return {
+      messages,
+      executed: false,
+      tokensFreed: 0,
+      boundaryMessages: [],
+    }
+  }
+
+  let workingMessages = messages
+  let tokensFreed = 0
+  const boundaryMessages: Message[] = []
+
+  for (const marker of markers) {
+    if (
+      !workingMessages.some(
+        message => String(message.uuid) === String(marker.uuid),
+      )
+    ) {
+      continue
+    }
+
+    const markedUuids = getMarkedUuids(marker)
+    workingMessages = workingMessages.filter(
+      message => String(message.uuid) !== String(marker.uuid),
+    )
+    if (markedUuids.length === 0) continue
+
+    /* eslint-disable @typescript-eslint/no-require-imports */
+    const { executeSnip } =
+      require('./snipExecute.js') as typeof import('./snipExecute.js')
+    /* eslint-enable @typescript-eslint/no-require-imports */
+    const boundary = await executeSnip({
+      messageIds: markedUuids,
+      store: workingMessages,
+      signal,
+      haikuOptions,
+    })
+
+    if (!boundary || !isSnipBoundaryMessage(boundary)) continue
+
+    boundaryMessages.push(boundary)
+    const compacted = snipCompactIfNeeded([...workingMessages, boundary])
+    workingMessages = compacted.messages
+    tokensFreed += compacted.tokensFreed
+  }
+
+  return {
+    messages: workingMessages,
+    executed: true,
+    tokensFreed,
+    boundaryMessage: boundaryMessages.at(-1),
+    boundaryMessages,
+  }
+}
+
+function findSnipMarkers(messages: Message[]): Message[] {
+  return messages.filter(isSnipMarkerMessage)
+}
+
+function getMarkedUuids(message: Message): string[] {
+  const markedUuids = (message as { markedUuids?: unknown }).markedUuids
+  if (!Array.isArray(markedUuids)) return []
+  return markedUuids.filter(
+    (markedUuid): markedUuid is string => typeof markedUuid === 'string',
+  )
+}
+
+function isSnipBoundaryMessage(message: Message): boolean {
+  return (
+    message.type === 'system' &&
+    (message as Record<string, unknown>).subtype === 'snip_boundary'
+  )
+}
+
 /**
  * Returns true when the snip runtime is active.
  * Because this module is only loaded when the HISTORY_SNIP feature flag
@@ -264,6 +356,31 @@ export async function maybeExecuteSnipFromToolResult(
   signal: AbortSignal,
   haikuOptions: SnipExecuteArgs['haikuOptions'],
 ): Promise<Message | undefined> {
+  const input = extractSnipRequestFromToolResult(toolResultMessage, store)
+  if (!input) return undefined
+
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const { executeSnip } =
+    require('./snipExecute.js') as typeof import('./snipExecute.js')
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  return executeSnip({
+    messageIds: input.messageIds,
+    reason: input.reason,
+    store,
+    signal,
+    haikuOptions,
+  })
+}
+
+export function extractSnipRequestFromToolResult(
+  toolResultMessage: Message,
+  store: Message[],
+):
+  | {
+      messageIds: string[]
+      reason?: string
+    }
+  | undefined {
   const content = toolResultMessage.message?.content
   if (!Array.isArray(content)) return undefined
 
@@ -283,18 +400,7 @@ export async function maybeExecuteSnipFromToolResult(
 
     const input = normalizeSnipInput(toolUseBlock.input)
     if (!input.messageIds.length) continue
-
-    /* eslint-disable @typescript-eslint/no-require-imports */
-    const { executeSnip } =
-      require('./snipExecute.js') as typeof import('./snipExecute.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
-    return executeSnip({
-      messageIds: input.messageIds,
-      reason: input.reason,
-      store,
-      signal,
-      haikuOptions,
-    })
+    return input
   }
   return undefined
 }

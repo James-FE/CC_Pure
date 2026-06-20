@@ -9,8 +9,12 @@ import {
   executeSnip,
   groupExchanges,
   isToolResultCarrier,
+  produceSnipMarker,
 } from '../snipExecute.js'
-import { maybeExecuteSnipFromToolResult } from '../snipCompact.js'
+import {
+  extractSnipRequestFromToolResult,
+  maybeExecuteSnipFromToolResult,
+} from '../snipCompact.js'
 
 function makeMessage(
   content: string,
@@ -212,6 +216,65 @@ describe('executeSnip', () => {
   })
 })
 
+describe('produceSnipMarker', () => {
+  test('registers selected messages as a snip marker without calling Haiku', () => {
+    const firstUser = makeMessage(longText, 'user', '2026-06-20T00:00:00.000Z')
+    const assistant = makeMessage(
+      'assistant details '.repeat(60),
+      'assistant',
+      '2026-06-20T00:00:01.000Z',
+    )
+    const nextUser = makeMessage('keep me', 'user', '2026-06-20T00:00:02.000Z')
+    const queryHaiku = mock(async () => ({
+      type: 'assistant',
+      uuid: randomUUID() as UUID,
+      message: {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Should not be called' }],
+      },
+    }))
+    mock.module('src/services/api/claude.js', () => ({ queryHaiku }))
+
+    const marker = produceSnipMarker({
+      messageIds: [firstUser.uuid],
+      reason: 'old exploration',
+      store: [firstUser, assistant, nextUser],
+      signal: new AbortController().signal,
+      haikuOptions: { systemPrompt: asSystemPrompt([]), maxTokens: 512 },
+    })
+
+    expect(marker).toMatchObject({
+      type: 'system',
+      subtype: 'snip_marker',
+      markedUuids: [firstUser.uuid, assistant.uuid],
+      estimatedTokens: 495,
+    })
+    expect(queryHaiku).toHaveBeenCalledTimes(0)
+  })
+
+  test('returns a snip_failed notice when no message IDs match', () => {
+    const missingIds = ['missing-a', 'missing-b']
+
+    const notice = produceSnipMarker({
+      messageIds: missingIds,
+      store: [makeMessage('keep me')],
+      signal: new AbortController().signal,
+      haikuOptions: { systemPrompt: asSystemPrompt([]), maxTokens: 512 },
+    })
+
+    expect(notice).toMatchObject({
+      type: 'system',
+      subtype: 'snip_failed',
+      missingMessageIds: missingIds,
+      message: {
+        role: 'system',
+        content:
+          'Snip failed: no requested message IDs were found: missing-a, missing-b',
+      },
+    })
+  })
+})
+
 describe('exchange grouping helpers', () => {
   test('treats tool_result user messages as part of the active exchange', () => {
     const firstUser = makeMessage('start')
@@ -241,6 +304,27 @@ describe('exchange grouping helpers', () => {
 })
 
 describe('maybeExecuteSnipFromToolResult', () => {
+  test('extracts Snip tool input so query can produce a marker', () => {
+    const target = makeMessage(longText)
+    const toolUseId = 'toolu_snip'
+    const toolUse = makeToolUseMessage(toolUseId, {
+      message_ids: [target.uuid],
+      reason: 'trim old context',
+    })
+    const toolResult = makeToolResultMessage(toolUseId)
+
+    const request = extractSnipRequestFromToolResult(toolResult, [
+      target,
+      toolUse,
+      toolResult,
+    ])
+
+    expect(request).toEqual({
+      messageIds: [target.uuid],
+      reason: 'trim old context',
+    })
+  })
+
   test('bridges a Snip tool result to a snip boundary message', async () => {
     const target = makeMessage(longText)
     const nextUser = makeMessage('next user message')
