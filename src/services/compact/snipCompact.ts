@@ -1,5 +1,5 @@
 import type { Message } from 'src/types/message.js'
-import type { SnipExecuteArgs } from './snipExecute.js'
+import { closeToolPairs, type SnipExecuteArgs } from './snipExecute.js'
 
 /**
  * Estimated characters per token (conservative for mixed code/text).
@@ -136,13 +136,22 @@ export function snipCompactIfNeeded(
     }
   }
 
-  // Filter out messages whose UUIDs are listed in removedUuids
+  // Filter out messages whose UUIDs are listed in removedUuids, closing over
+  // tool_use/tool_result pairs so the model-facing array cannot contain one
+  // side without the other.
   const removedSet = new Set(removedUuids)
+  const closedRemovedMessages = closeToolPairs(
+    messages.filter(msg => removedSet.has(String(msg.uuid))),
+    messages,
+  )
+  const closedRemovedSet = new Set(
+    closedRemovedMessages.map(msg => String(msg.uuid)),
+  )
   const kept: Message[] = []
   let tokensFreed = 0
 
   for (const msg of messages) {
-    if (removedSet.has(msg.uuid)) {
+    if (closedRemovedSet.has(String(msg.uuid))) {
       tokensFreed += estimateMessageTokens(msg)
       continue
     }

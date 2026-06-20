@@ -3,7 +3,12 @@ import { describe, expect, mock, test } from 'bun:test'
 import type { UUID } from 'crypto'
 import type { Message } from 'src/types/message.js'
 import { asSystemPrompt } from 'src/utils/systemPromptType.js'
-import { executeSnip } from '../snipExecute.js'
+import {
+  closeToolPairs,
+  executeSnip,
+  groupExchanges,
+  isToolResultCarrier,
+} from '../snipExecute.js'
 import { maybeExecuteSnipFromToolResult } from '../snipCompact.js'
 
 function makeMessage(
@@ -117,6 +122,71 @@ describe('executeSnip', () => {
     })
 
     expect(boundary).toBeUndefined()
+  })
+
+  test('removes matching tool_result carrier when snipping an exchange with tool_use', async () => {
+    const firstUser = makeMessage(longText, 'user', '2026-06-20T00:00:00.000Z')
+    const toolUse = makeToolUseMessage('toolu_read', { file_path: 'a.ts' })
+    const toolResult = makeToolResultMessage('toolu_read')
+    const assistant = makeMessage(
+      'assistant final '.repeat(60),
+      'assistant',
+      '2026-06-20T00:00:03.000Z',
+    )
+    const nextUser = makeMessage('keep me', 'user', '2026-06-20T00:00:04.000Z')
+    const queryHaiku = mock(async () => ({
+      type: 'assistant',
+      uuid: randomUUID() as UUID,
+      message: {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Tool exchange summary' }],
+      },
+    }))
+    mock.module('src/services/api/claude.js', () => ({ queryHaiku }))
+
+    const boundary = await executeSnip({
+      messageIds: [firstUser.uuid],
+      store: [firstUser, toolUse, toolResult, assistant, nextUser],
+      signal: new AbortController().signal,
+      haikuOptions: { systemPrompt: asSystemPrompt([]), maxTokens: 512 },
+    })
+
+    expect(boundary?.snipMetadata).toEqual({
+      removedUuids: [
+        firstUser.uuid,
+        toolUse.uuid,
+        toolResult.uuid,
+        assistant.uuid,
+      ],
+    })
+  })
+})
+
+describe('exchange grouping helpers', () => {
+  test('treats tool_result user messages as part of the active exchange', () => {
+    const firstUser = makeMessage('start')
+    const toolUse = makeToolUseMessage('toolu_read', {})
+    const toolResult = makeToolResultMessage('toolu_read')
+    const nextUser = makeMessage('next')
+
+    expect(isToolResultCarrier(toolResult)).toBe(true)
+    expect(groupExchanges([firstUser, toolUse, toolResult, nextUser])).toEqual([
+      [firstUser, toolUse, toolResult],
+      [nextUser],
+    ])
+  })
+
+  test('removes orphan tool pair candidates from the deletion set', () => {
+    const user = makeMessage(longText)
+    const orphanToolUse = makeToolUseMessage('toolu_missing_result', {})
+    const nextUser = makeMessage('next')
+
+    const closed = closeToolPairs(
+      [user, orphanToolUse],
+      [user, orphanToolUse, nextUser],
+    )
+
+    expect(closed).toEqual([user])
   })
 })
 

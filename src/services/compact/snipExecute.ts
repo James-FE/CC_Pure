@@ -32,27 +32,31 @@ type TextBlock = {
 export async function executeSnip(
   args: SnipExecuteArgs,
 ): Promise<Message | undefined> {
-  const removedUuids: string[] = []
   const removedMessages: Message[] = []
-  const seenUuids = new Set<string>()
+  const exchanges = groupExchanges(args.store)
 
   for (const messageId of args.messageIds) {
-    const msg = args.store.find(m => m.uuid === messageId)
-    if (!msg) continue
-    const idx = args.store.indexOf(msg)
-    addRemovedMessage(msg, removedMessages, removedUuids, seenUuids)
-
-    for (let j = idx + 1; j < args.store.length; j++) {
-      const next = args.store[j]!
-      if (next.type === 'user') break
-      addRemovedMessage(next, removedMessages, removedUuids, seenUuids)
+    const exchange = exchanges.find(candidate =>
+      candidate.some(message => message.uuid === messageId),
+    )
+    if (exchange) {
+      removedMessages.push(...exchange)
+      continue
     }
+
+    const msg = args.store.find(m => m.uuid === messageId)
+    if (msg) removedMessages.push(msg)
   }
+
+  const closedRemovedMessages = closeToolPairs(removedMessages, args.store)
+  const removedUuids = closedRemovedMessages.map(message =>
+    String(message.uuid),
+  )
 
   if (removedUuids.length === 0) return undefined
 
   let removedTokens = 0
-  for (const message of removedMessages) {
+  for (const message of closedRemovedMessages) {
     removedTokens += estimateMessageTokens(message)
   }
   if (removedTokens < MIN_REMOVED_TOKENS) return undefined
@@ -65,8 +69,8 @@ export async function executeSnip(
 
   const deterministicFallback = () => {
     const count = removedUuids.length
-    const from = String(removedMessages[0]?.timestamp ?? '?')
-    const to = String(removedMessages.at(-1)?.timestamp ?? '?')
+    const from = String(closedRemovedMessages[0]?.timestamp ?? '?')
+    const to = String(closedRemovedMessages.at(-1)?.timestamp ?? '?')
     return (
       args.reason ??
       `Snipped ${count} messages (${removedTokens} tokens) from ${from} to ${to}`
@@ -81,7 +85,7 @@ export async function executeSnip(
     /* eslint-enable @typescript-eslint/no-require-imports */
     const response = await queryHaiku({
       systemPrompt: asSystemPrompt(args.haikuOptions.systemPrompt),
-      userPrompt: renderExchangesForSummary(removedMessages),
+      userPrompt: renderExchangesForSummary(closedRemovedMessages),
       signal: args.signal,
       options: {
         querySource: 'snip_summary_generation',
@@ -112,16 +116,65 @@ export async function executeSnip(
   } as Message
 }
 
-function addRemovedMessage(
-  message: Message,
-  removedMessages: Message[],
-  removedUuids: string[],
-  seenUuids: Set<string>,
-) {
-  if (seenUuids.has(message.uuid)) return
-  seenUuids.add(message.uuid)
-  removedMessages.push(message)
-  removedUuids.push(message.uuid)
+export function isToolResultCarrier(message: Message): boolean {
+  if (message.type !== 'user') return false
+  return getToolResultIds(message).length > 0
+}
+
+function isRealUserTurn(message: Message): boolean {
+  return (
+    message.type === 'user' && !message.isMeta && !isToolResultCarrier(message)
+  )
+}
+
+export function groupExchanges(store: Message[]): Message[][] {
+  const exchanges: Message[][] = []
+  let current: Message[] | undefined
+
+  for (const message of store) {
+    if (isRealUserTurn(message)) {
+      if (current && current.length > 0) exchanges.push(current)
+      current = [message]
+      continue
+    }
+
+    if (current) current.push(message)
+  }
+
+  if (current && current.length > 0) exchanges.push(current)
+  return exchanges
+}
+
+export function closeToolPairs(
+  removed: Message[],
+  store: Message[],
+): Message[] {
+  const selected = new Set(removed.map(message => String(message.uuid)))
+  if (selected.size === 0) return []
+
+  const storeByUuid = new Map(
+    store.map(message => [String(message.uuid), message] as const),
+  )
+  const { adjacency, orphanMessageUuids } = buildToolPairGraph(store)
+
+  for (const uuid of Array.from(selected)) {
+    if (!storeByUuid.has(uuid)) selected.delete(uuid)
+  }
+
+  for (const uuid of Array.from(selected)) {
+    for (const connectedUuid of collectConnectedUuids(uuid, adjacency)) {
+      selected.add(connectedUuid)
+    }
+  }
+
+  for (const uuid of Array.from(selected)) {
+    if (!orphanMessageUuids.has(uuid)) continue
+    for (const connectedUuid of collectConnectedUuids(uuid, adjacency)) {
+      selected.delete(connectedUuid)
+    }
+  }
+
+  return store.filter(message => selected.has(String(message.uuid)))
 }
 
 export function extractTextContent(res: QueryHaikuResponse): string | null {
@@ -169,4 +222,120 @@ function renderContentBlock(block: unknown): string {
   const record = block as Record<string, unknown>
   if (typeof record.text === 'string') return record.text
   return JSON.stringify(record)
+}
+
+function getContentBlocks(message: Message): unknown[] {
+  const content = message.message?.content
+  return Array.isArray(content) ? content : []
+}
+
+function getToolUseIds(message: Message): string[] {
+  const ids: string[] = []
+  for (const block of getContentBlocks(message)) {
+    if (!block || typeof block !== 'object') continue
+    const record = block as Record<string, unknown>
+    if (record.type === 'tool_use' && typeof record.id === 'string') {
+      ids.push(record.id)
+    }
+  }
+  return ids
+}
+
+function getToolResultIds(message: Message): string[] {
+  const ids: string[] = []
+  for (const block of getContentBlocks(message)) {
+    if (!block || typeof block !== 'object') continue
+    const record = block as Record<string, unknown>
+    if (
+      record.type === 'tool_result' &&
+      typeof record.tool_use_id === 'string'
+    ) {
+      ids.push(record.tool_use_id)
+    }
+  }
+  return ids
+}
+
+function buildToolPairGraph(store: Message[]): {
+  adjacency: Map<string, Set<string>>
+  orphanMessageUuids: Set<string>
+} {
+  const adjacency = new Map<string, Set<string>>()
+  const orphanMessageUuids = new Set<string>()
+  const toolUseMessages = new Map<string, Message[]>()
+  const toolResultMessages = new Map<string, Message[]>()
+
+  for (const message of store) {
+    for (const id of getToolUseIds(message)) {
+      const messages = toolUseMessages.get(id) ?? []
+      messages.push(message)
+      toolUseMessages.set(id, messages)
+    }
+    for (const id of getToolResultIds(message)) {
+      const messages = toolResultMessages.get(id) ?? []
+      messages.push(message)
+      toolResultMessages.set(id, messages)
+    }
+  }
+
+  const allToolIds = new Set([
+    ...toolUseMessages.keys(),
+    ...toolResultMessages.keys(),
+  ])
+
+  for (const id of allToolIds) {
+    const useMessages = toolUseMessages.get(id) ?? []
+    const resultMessages = toolResultMessages.get(id) ?? []
+
+    if (useMessages.length === 0 || resultMessages.length === 0) {
+      for (const message of [...useMessages, ...resultMessages]) {
+        orphanMessageUuids.add(String(message.uuid))
+      }
+      continue
+    }
+
+    for (const useMessage of useMessages) {
+      for (const resultMessage of resultMessages) {
+        connectMessages(adjacency, useMessage, resultMessage)
+      }
+    }
+  }
+
+  return { adjacency, orphanMessageUuids }
+}
+
+function connectMessages(
+  adjacency: Map<string, Set<string>>,
+  left: Message,
+  right: Message,
+) {
+  const leftUuid = String(left.uuid)
+  const rightUuid = String(right.uuid)
+  const leftEdges = adjacency.get(leftUuid) ?? new Set<string>()
+  const rightEdges = adjacency.get(rightUuid) ?? new Set<string>()
+
+  leftEdges.add(rightUuid)
+  rightEdges.add(leftUuid)
+  adjacency.set(leftUuid, leftEdges)
+  adjacency.set(rightUuid, rightEdges)
+}
+
+function collectConnectedUuids(
+  startUuid: string,
+  adjacency: Map<string, Set<string>>,
+): Set<string> {
+  const visited = new Set<string>()
+  const stack = [startUuid]
+
+  while (stack.length > 0) {
+    const uuid = stack.pop()!
+    if (visited.has(uuid)) continue
+    visited.add(uuid)
+
+    for (const nextUuid of adjacency.get(uuid) ?? []) {
+      if (!visited.has(nextUuid)) stack.push(nextUuid)
+    }
+  }
+
+  return visited
 }
