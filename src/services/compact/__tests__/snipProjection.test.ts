@@ -2,11 +2,7 @@ import { randomUUID } from 'crypto'
 import { describe, expect, test } from 'bun:test'
 import type { UUID } from 'crypto'
 import type { Message } from 'src/types/message.js'
-import {
-  createSnipBoundary,
-  isSnipBoundaryMessage,
-  projectSnippedView,
-} from '../snipProjection.js'
+import { isSnipBoundaryMessage, projectSnippedView } from '../snipProjection.js'
 
 function makeMessage(label: string): Message {
   return {
@@ -19,6 +15,15 @@ function makeMessage(label: string): Message {
   }
 }
 
+function makeSnipBoundary(removedUuids: string[]): Message {
+  return {
+    type: 'system',
+    uuid: randomUUID() as UUID,
+    subtype: 'snip_boundary',
+    snipMetadata: { removedUuids },
+  }
+}
+
 describe('projectSnippedView', () => {
   test('returns original messages when there is no boundary', () => {
     const messages = [makeMessage('one')]
@@ -26,51 +31,47 @@ describe('projectSnippedView', () => {
     expect(projectSnippedView(messages)).toBe(messages)
   })
 
-  test('returns messages from the last snip boundary onward', () => {
-    const firstBoundary = createSnipBoundary({
-      messageCount: 2,
-      dateRange: { from: '2026-01-01', to: '2026-01-02' },
-    })
-    const secondBoundary = createSnipBoundary({
-      messageCount: 3,
-      tokenCount: 42,
-      dateRange: { from: '2026-01-03', to: '2026-01-04' },
-      summary: 'previous work',
-    })
-    const tail = makeMessage('tail')
+  test('removes only messages listed by the snip boundary removedUuids', () => {
+    const keepBefore = makeMessage('keep-before')
+    const removeOne = makeMessage('remove-one')
+    const keepMiddle = makeMessage('keep-middle')
+    const removeTwo = makeMessage('remove-two')
+    const keepAfter = makeMessage('keep-after')
+    const boundary = makeSnipBoundary([removeOne.uuid, removeTwo.uuid])
     const messages = [
-      makeMessage('before'),
-      firstBoundary,
-      makeMessage('middle'),
-      secondBoundary,
-      tail,
+      keepBefore,
+      removeOne,
+      keepMiddle,
+      removeTwo,
+      boundary,
+      keepAfter,
     ]
 
-    expect(projectSnippedView(messages)).toEqual([secondBoundary, tail])
+    expect(projectSnippedView(messages)).toEqual([
+      keepBefore,
+      keepMiddle,
+      boundary,
+      keepAfter,
+    ])
   })
-})
 
-describe('createSnipBoundary', () => {
-  test('creates a detectable synthetic boundary message', () => {
-    const boundary = createSnipBoundary({
-      messageCount: 3,
-      tokenCount: 42,
-      dateRange: { from: '2026-01-01', to: '2026-01-02' },
-      summary: 'summary',
-    })
+  test('retains messages before the boundary when not listed in removedUuids', () => {
+    const keepBefore = makeMessage('keep-before')
+    const removeBefore = makeMessage('remove-before')
+    const boundary = makeSnipBoundary([removeBefore.uuid])
+    const keepAfter = makeMessage('keep-after')
+    const messages = [keepBefore, removeBefore, boundary, keepAfter]
+
+    expect(projectSnippedView(messages)).toEqual([
+      keepBefore,
+      boundary,
+      keepAfter,
+    ])
+  })
+
+  test('detects system snip boundary messages with removedUuids metadata', () => {
+    const boundary = makeSnipBoundary(['removed'])
 
     expect(isSnipBoundaryMessage(boundary)).toBe(true)
-    expect(boundary.type).toBe('user')
-    expect(typeof boundary.uuid).toBe('string')
-    expect(boundary.message?.content).toBe(
-      '[Earlier conversation snipped - 3 messages removed]',
-    )
-    expect(boundary.snipBoundary).toMatchObject({
-      role: 'boundary',
-      messageCount: 3,
-      tokenCount: 42,
-      dateRange: { from: '2026-01-01', to: '2026-01-02' },
-      summary: 'summary',
-    })
   })
 })

@@ -612,6 +612,21 @@ async function* queryLoop(
       if (snipResult.boundaryMessage) {
         yield snipResult.boundaryMessage
       }
+      const markerResult = await snipModule!.resolveSnipMarkersIfNeeded(
+        messagesForQuery,
+        toolUseContext.abortController.signal,
+        {
+          systemPrompt: [],
+          maxTokens: 512,
+        },
+      )
+      if (markerResult.executed) {
+        messagesForQuery = markerResult.messages
+        snipTokensFreed += markerResult.tokensFreed
+        for (const boundaryMessage of markerResult.boundaryMessages) {
+          yield boundaryMessage
+        }
+      }
       queryCheckpoint('query_snip_end')
     }
 
@@ -1656,6 +1671,8 @@ async function* queryLoop(
       ? streamingToolExecutor.getRemainingResults()
       : runTools(toolUseBlocks, assistantMessages, canUseTool, toolUseContext)
 
+    const snipGeneratedMessages: Message[] = []
+
     for await (const update of toolUpdates) {
       if (update.message) {
         yield update.message
@@ -1667,12 +1684,47 @@ async function* queryLoop(
           shouldPreventContinuation = true
         }
 
-        toolResults.push(
-          ...normalizeMessagesForAPI(
-            [update.message],
-            toolUseContext.options.tools,
-          ).filter(_ => _.type === 'user'),
-        )
+        const normalizedToolResults = normalizeMessagesForAPI(
+          [update.message],
+          toolUseContext.options.tools,
+        ).filter(_ => _.type === 'user')
+
+        toolResults.push(...normalizedToolResults)
+
+        if (feature('HISTORY_SNIP') && snipModule) {
+          for (const toolResultMessage of normalizedToolResults) {
+            const request = snipModule.extractSnipRequestFromToolResult(
+              toolResultMessage,
+              [
+                ...messagesForQuery,
+                ...assistantMessages,
+                ...toolResults,
+                ...snipGeneratedMessages,
+              ],
+            )
+            if (!request) continue
+
+            const marker = snipModule.produceSnipMarker({
+              messageIds: request.messageIds,
+              reason: request.reason,
+              store: [
+                ...messagesForQuery,
+                ...assistantMessages,
+                ...toolResults,
+                ...snipGeneratedMessages,
+              ],
+              signal: toolUseContext.abortController.signal,
+              haikuOptions: {
+                systemPrompt: [],
+                maxTokens: 512,
+              },
+            })
+            if (marker) {
+              yield marker
+              snipGeneratedMessages.push(marker)
+            }
+          }
+        }
       }
       if (update.newContext) {
         updatedToolUseContext = {
@@ -1998,6 +2050,7 @@ async function* queryLoop(
             ...messagesForQuery,
             ...assistantMessages,
             ...toolResults,
+            ...snipGeneratedMessages,
           ],
         })
       }
@@ -2015,7 +2068,12 @@ async function* queryLoop(
 
     queryCheckpoint('query_recursive_call')
     const next: State = {
-      messages: [...messagesForQuery, ...assistantMessages, ...toolResults],
+      messages: [
+        ...messagesForQuery,
+        ...assistantMessages,
+        ...toolResults,
+        ...snipGeneratedMessages,
+      ],
       toolUseContext: toolUseContextWithQueryTracking,
       autoCompactTracking: tracking,
       turnCount: nextTurnCount,

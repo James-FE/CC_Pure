@@ -2,11 +2,13 @@ import { randomUUID } from 'crypto'
 import { describe, expect, test } from 'bun:test'
 import type { UUID } from 'crypto'
 import type { Message } from 'src/types/message.js'
+import type { ContextCollapseCommitEntry } from 'src/types/logs.js'
 import {
   createSummaryMessage,
   type CollapseEntry,
   projectView,
 } from '../operations.js'
+import { restoreFromEntries } from '../persist.js'
 
 function makeMessage(label: string): Message {
   return {
@@ -45,6 +47,23 @@ function makeEntry(
       tokensOut: 8,
       strategy: 'llm-summary',
     },
+  }
+}
+
+function makeCommit(
+  firstArchivedUuid: string,
+  lastArchivedUuid: string,
+  summary: string,
+): ContextCollapseCommitEntry {
+  return {
+    type: 'marble-origami-commit',
+    sessionId: 'session-id' as UUID,
+    collapseId: randomUUID(),
+    summaryUuid: randomUUID(),
+    summaryContent: `<collapsed id="collapse">${summary}</collapsed>`,
+    summary,
+    firstArchivedUuid,
+    lastArchivedUuid,
   }
 }
 
@@ -89,6 +108,26 @@ describe('projectView', () => {
       '[Collapsed 1 messages]\n\nvalid summary',
     )
     expect(projected[2]).toBe(messages[2])
+  })
+
+  test('uses restored UUID-based commits when no collapse log is provided', () => {
+    const messages = ['m0', 'm1', 'm2', 'm3'].map(makeMessage)
+    restoreFromEntries(
+      [
+        makeCommit(messages[1]!.uuid, messages[2]!.uuid, 'restored summary'),
+        makeCommit('missing-start', messages[3]!.uuid, 'missing summary'),
+      ],
+      null,
+    )
+
+    const projected = projectView(messages)
+
+    expect(projected).toHaveLength(3)
+    expect(projected[0]).toBe(messages[0])
+    expect(projected[1]?.message?.content).toBe(
+      '[Collapsed 2 messages]\n\nrestored summary',
+    )
+    expect(projected[2]).toBe(messages[3])
   })
 })
 

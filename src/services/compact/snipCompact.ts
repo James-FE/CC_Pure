@@ -1,4 +1,15 @@
 import type { Message } from 'src/types/message.js'
+import { closeToolPairs, type SnipExecuteArgs } from './snipExecute.js'
+
+export { produceSnipMarker } from './snipExecute.js'
+
+export type SnipCompactResult = {
+  messages: Message[]
+  executed: boolean
+  tokensFreed: number
+  boundaryMessage?: Message
+  boundaryMessages: Message[]
+}
 
 /**
  * Estimated characters per token (conservative for mixed code/text).
@@ -32,7 +43,7 @@ export function isSnipMarkerMessage(message: Message): boolean {
  * This is a rough heuristic (~4 chars per token) used to report
  * tokensFreed; it does not need to be exact.
  */
-function estimateMessageTokens(message: Message): number {
+export function estimateMessageTokens(message: Message): number {
   const content = message.message?.content
   let chars = 0
   if (typeof content === 'string') {
@@ -55,6 +66,33 @@ function estimateMessageTokens(message: Message): number {
     chars = JSON.stringify(content).length
   }
   return Math.max(1, Math.ceil(chars / CHARS_PER_TOKEN))
+}
+
+export function findSnipBoundary(messages: Message[]):
+  | {
+      index: number
+      removedUuids: string[]
+      boundaryMessage: Message
+    }
+  | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]!
+    if (
+      msg.type === 'system' &&
+      (msg as Record<string, unknown>).subtype === 'snip_boundary'
+    ) {
+      const meta = (msg as { snipMetadata?: { removedUuids?: unknown } })
+        .snipMetadata
+      if (Array.isArray(meta?.removedUuids)) {
+        return {
+          index: i,
+          removedUuids: meta.removedUuids,
+          boundaryMessage: msg,
+        }
+      }
+    }
+  }
+  return undefined
 }
 
 /**
@@ -89,33 +127,16 @@ export function snipCompactIfNeeded(
   tokensFreed: number
   boundaryMessage?: Message
 } {
-  // Find the last snip_boundary message
-  let boundaryIdx = -1
-  let removedUuids: string[] | undefined
+  const boundary = findSnipBoundary(messages)
 
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i]!
-    if (
-      msg.type === 'system' &&
-      (msg as Record<string, unknown>).subtype === 'snip_boundary'
-    ) {
-      boundaryIdx = i
-      const meta = (msg as Record<string, unknown>).snipMetadata as
-        | { removedUuids?: string[] }
-        | undefined
-      removedUuids = meta?.removedUuids
-      break
-    }
-  }
-
-  if (boundaryIdx === -1) {
+  if (!boundary) {
     return { messages, executed: false, tokensFreed: 0 }
   }
 
-  const boundaryMessage = messages[boundaryIdx]!
+  const { boundaryMessage, index: boundaryIdx, removedUuids } = boundary
 
-  // No removedUuids metadata — fallback: keep boundary + everything after
-  if (!removedUuids || removedUuids.length === 0) {
+  // Empty removedUuids metadata — fallback: keep boundary + everything after
+  if (removedUuids.length === 0) {
     const kept = messages.slice(boundaryIdx)
     return {
       messages: kept,
@@ -125,13 +146,22 @@ export function snipCompactIfNeeded(
     }
   }
 
-  // Filter out messages whose UUIDs are listed in removedUuids
+  // Filter out messages whose UUIDs are listed in removedUuids, closing over
+  // tool_use/tool_result pairs so the model-facing array cannot contain one
+  // side without the other.
   const removedSet = new Set(removedUuids)
+  const closedRemovedMessages = closeToolPairs(
+    messages.filter(msg => removedSet.has(String(msg.uuid))),
+    messages,
+  )
+  const closedRemovedSet = new Set(
+    closedRemovedMessages.map(msg => String(msg.uuid)),
+  )
   const kept: Message[] = []
   let tokensFreed = 0
 
   for (const msg of messages) {
-    if (removedSet.has(msg.uuid)) {
+    if (closedRemovedSet.has(String(msg.uuid))) {
       tokensFreed += estimateMessageTokens(msg)
       continue
     }
@@ -144,6 +174,88 @@ export function snipCompactIfNeeded(
     tokensFreed,
     boundaryMessage,
   }
+}
+
+export async function resolveSnipMarkersIfNeeded(
+  messages: Message[],
+  signal: AbortSignal,
+  haikuOptions: SnipExecuteArgs['haikuOptions'],
+): Promise<SnipCompactResult> {
+  const markers = findSnipMarkers(messages)
+
+  if (markers.length === 0) {
+    return {
+      messages,
+      executed: false,
+      tokensFreed: 0,
+      boundaryMessages: [],
+    }
+  }
+
+  let workingMessages = messages
+  let tokensFreed = 0
+  const boundaryMessages: Message[] = []
+
+  for (const marker of markers) {
+    if (
+      !workingMessages.some(
+        message => String(message.uuid) === String(marker.uuid),
+      )
+    ) {
+      continue
+    }
+
+    const markedUuids = getMarkedUuids(marker)
+    workingMessages = workingMessages.filter(
+      message => String(message.uuid) !== String(marker.uuid),
+    )
+    if (markedUuids.length === 0) continue
+
+    /* eslint-disable @typescript-eslint/no-require-imports */
+    const { executeSnip } =
+      require('./snipExecute.js') as typeof import('./snipExecute.js')
+    /* eslint-enable @typescript-eslint/no-require-imports */
+    const boundary = await executeSnip({
+      messageIds: markedUuids,
+      store: workingMessages,
+      signal,
+      haikuOptions,
+    })
+
+    if (!boundary || !isSnipBoundaryMessage(boundary)) continue
+
+    boundaryMessages.push(boundary)
+    const compacted = snipCompactIfNeeded([...workingMessages, boundary])
+    workingMessages = compacted.messages
+    tokensFreed += compacted.tokensFreed
+  }
+
+  return {
+    messages: workingMessages,
+    executed: true,
+    tokensFreed,
+    boundaryMessage: boundaryMessages.at(-1),
+    boundaryMessages,
+  }
+}
+
+function findSnipMarkers(messages: Message[]): Message[] {
+  return messages.filter(isSnipMarkerMessage)
+}
+
+function getMarkedUuids(message: Message): string[] {
+  const markedUuids = (message as { markedUuids?: unknown }).markedUuids
+  if (!Array.isArray(markedUuids)) return []
+  return markedUuids.filter(
+    (markedUuid): markedUuid is string => typeof markedUuid === 'string',
+  )
+}
+
+function isSnipBoundaryMessage(message: Message): boolean {
+  return (
+    message.type === 'system' &&
+    (message as Record<string, unknown>).subtype === 'snip_boundary'
+  )
 }
 
 /**
@@ -236,4 +348,99 @@ export function proactiveTruncate(messages: Message[]): Message[] {
   if (keepFrom === 0) return messages
 
   return messages.slice(keepFrom)
+}
+
+export async function maybeExecuteSnipFromToolResult(
+  toolResultMessage: Message,
+  store: Message[],
+  signal: AbortSignal,
+  haikuOptions: SnipExecuteArgs['haikuOptions'],
+): Promise<Message | undefined> {
+  const input = extractSnipRequestFromToolResult(toolResultMessage, store)
+  if (!input) return undefined
+
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const { executeSnip } =
+    require('./snipExecute.js') as typeof import('./snipExecute.js')
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  return executeSnip({
+    messageIds: input.messageIds,
+    reason: input.reason,
+    store,
+    signal,
+    haikuOptions,
+  })
+}
+
+export function extractSnipRequestFromToolResult(
+  toolResultMessage: Message,
+  store: Message[],
+):
+  | {
+      messageIds: string[]
+      reason?: string
+    }
+  | undefined {
+  const content = toolResultMessage.message?.content
+  if (!Array.isArray(content)) return undefined
+
+  for (const block of content) {
+    if (!isToolResultBlock(block)) continue
+
+    const toolUse = store.find(message =>
+      getContentBlocks(message).some(
+        candidate =>
+          isSnipToolUseBlock(candidate) && candidate.id === block.tool_use_id,
+      ),
+    )
+    if (!toolUse) continue
+
+    const toolUseBlock = getContentBlocks(toolUse).find(isSnipToolUseBlock)
+    if (!toolUseBlock) continue
+
+    const input = normalizeSnipInput(toolUseBlock.input)
+    if (!input.messageIds.length) continue
+    return input
+  }
+  return undefined
+}
+
+function getContentBlocks(message: Message): unknown[] {
+  const content = message.message?.content
+  return Array.isArray(content) ? content : []
+}
+
+function isToolResultBlock(
+  block: unknown,
+): block is { type: 'tool_result'; tool_use_id: string } {
+  if (!block || typeof block !== 'object') return false
+  const record = block as Record<string, unknown>
+  return record.type === 'tool_result' && typeof record.tool_use_id === 'string'
+}
+
+function isSnipToolUseBlock(
+  block: unknown,
+): block is { type: 'tool_use'; id: string; name: string; input: unknown } {
+  if (!block || typeof block !== 'object') return false
+  const record = block as Record<string, unknown>
+  return (
+    record.type === 'tool_use' &&
+    record.name === 'Snip' &&
+    typeof record.id === 'string'
+  )
+}
+
+function normalizeSnipInput(input: unknown): {
+  messageIds: string[]
+  reason?: string
+} {
+  if (!input || typeof input !== 'object') return { messageIds: [] }
+  const record = input as Record<string, unknown>
+  const messageIds = Array.isArray(record.message_ids)
+    ? record.message_ids.filter(
+        (messageId): messageId is string => typeof messageId === 'string',
+      )
+    : []
+  const reason = typeof record.reason === 'string' ? record.reason : undefined
+  return { messageIds, reason }
 }
