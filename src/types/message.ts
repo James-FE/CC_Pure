@@ -83,20 +83,23 @@ export type RequestStartEvent = { type: string; [key: string]: unknown }
 export type StreamEvent = { type: string; [key: string]: unknown }
 export type SystemCompactBoundaryMessage = Message & {
   type: 'system'
-  compactMetadata: {
-    preservedSegment?: {
-      headUuid: UUID
-      tailUuid: UUID
-      anchorUuid: UUID
-      [key: string]: unknown
-    }
-    [key: string]: unknown
-  }
+  compactMetadata: CompactMetadata
 }
 export type TombstoneMessage = Message
 export type ToolUseSummaryMessage = Message
 export type MessageOrigin = string | { kind: string; [key: string]: unknown }
-export type CompactMetadata = Record<string, unknown>
+export interface CompactMetadata {
+  readonly trigger?: string
+  readonly preTokens?: number
+  readonly userContext?: string
+  readonly messagesSummarized?: number
+  preCompactDiscoveredTools?: readonly string[]
+  readonly preservedSegment?: {
+    readonly headUuid: UUID | any
+    readonly tailUuid: UUID | any
+    readonly anchorUuid: UUID | any
+  }
+}
 export type SystemAPIErrorMessage = Message & { type: 'system' }
 export type SystemFileSnapshotMessage = Message & { type: 'system' }
 export type NormalizedAssistantMessage<T = unknown> = AssistantMessage
