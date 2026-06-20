@@ -1,4 +1,5 @@
 import type { Message } from 'src/types/message.js'
+import type { SnipExecuteArgs } from './snipExecute.js'
 
 /**
  * Estimated characters per token (conservative for mixed code/text).
@@ -246,4 +247,85 @@ export function proactiveTruncate(messages: Message[]): Message[] {
   if (keepFrom === 0) return messages
 
   return messages.slice(keepFrom)
+}
+
+export async function maybeExecuteSnipFromToolResult(
+  toolResultMessage: Message,
+  store: Message[],
+  signal: AbortSignal,
+  haikuOptions: SnipExecuteArgs['haikuOptions'],
+): Promise<Message | undefined> {
+  const content = toolResultMessage.message?.content
+  if (!Array.isArray(content)) return undefined
+
+  for (const block of content) {
+    if (!isToolResultBlock(block)) continue
+
+    const toolUse = store.find(message =>
+      getContentBlocks(message).some(
+        candidate =>
+          isSnipToolUseBlock(candidate) && candidate.id === block.tool_use_id,
+      ),
+    )
+    if (!toolUse) continue
+
+    const toolUseBlock = getContentBlocks(toolUse).find(isSnipToolUseBlock)
+    if (!toolUseBlock) continue
+
+    const input = normalizeSnipInput(toolUseBlock.input)
+    if (!input.messageIds.length) continue
+
+    /* eslint-disable @typescript-eslint/no-require-imports */
+    const { executeSnip } =
+      require('./snipExecute.js') as typeof import('./snipExecute.js')
+    /* eslint-enable @typescript-eslint/no-require-imports */
+    return executeSnip({
+      messageIds: input.messageIds,
+      reason: input.reason,
+      store,
+      signal,
+      haikuOptions,
+    })
+  }
+  return undefined
+}
+
+function getContentBlocks(message: Message): unknown[] {
+  const content = message.message?.content
+  return Array.isArray(content) ? content : []
+}
+
+function isToolResultBlock(
+  block: unknown,
+): block is { type: 'tool_result'; tool_use_id: string } {
+  if (!block || typeof block !== 'object') return false
+  const record = block as Record<string, unknown>
+  return record.type === 'tool_result' && typeof record.tool_use_id === 'string'
+}
+
+function isSnipToolUseBlock(
+  block: unknown,
+): block is { type: 'tool_use'; id: string; name: string; input: unknown } {
+  if (!block || typeof block !== 'object') return false
+  const record = block as Record<string, unknown>
+  return (
+    record.type === 'tool_use' &&
+    record.name === 'Snip' &&
+    typeof record.id === 'string'
+  )
+}
+
+function normalizeSnipInput(input: unknown): {
+  messageIds: string[]
+  reason?: string
+} {
+  if (!input || typeof input !== 'object') return { messageIds: [] }
+  const record = input as Record<string, unknown>
+  const messageIds = Array.isArray(record.message_ids)
+    ? record.message_ids.filter(
+        (messageId): messageId is string => typeof messageId === 'string',
+      )
+    : []
+  const reason = typeof record.reason === 'string' ? record.reason : undefined
+  return { messageIds, reason }
 }

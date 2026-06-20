@@ -1656,6 +1656,8 @@ async function* queryLoop(
       ? streamingToolExecutor.getRemainingResults()
       : runTools(toolUseBlocks, assistantMessages, canUseTool, toolUseContext)
 
+    const snipBoundaryMessages: Message[] = []
+
     for await (const update of toolUpdates) {
       if (update.message) {
         yield update.message
@@ -1667,12 +1669,35 @@ async function* queryLoop(
           shouldPreventContinuation = true
         }
 
-        toolResults.push(
-          ...normalizeMessagesForAPI(
-            [update.message],
-            toolUseContext.options.tools,
-          ).filter(_ => _.type === 'user'),
-        )
+        const normalizedToolResults = normalizeMessagesForAPI(
+          [update.message],
+          toolUseContext.options.tools,
+        ).filter(_ => _.type === 'user')
+
+        toolResults.push(...normalizedToolResults)
+
+        if (feature('HISTORY_SNIP') && snipModule) {
+          for (const toolResultMessage of normalizedToolResults) {
+            const boundary = await snipModule.maybeExecuteSnipFromToolResult(
+              toolResultMessage,
+              [
+                ...messagesForQuery,
+                ...assistantMessages,
+                ...toolResults,
+                ...snipBoundaryMessages,
+              ],
+              toolUseContext.abortController.signal,
+              {
+                systemPrompt: [],
+                maxTokens: 512,
+              },
+            )
+            if (boundary) {
+              yield boundary
+              snipBoundaryMessages.push(boundary)
+            }
+          }
+        }
       }
       if (update.newContext) {
         updatedToolUseContext = {
@@ -1998,6 +2023,7 @@ async function* queryLoop(
             ...messagesForQuery,
             ...assistantMessages,
             ...toolResults,
+            ...snipBoundaryMessages,
           ],
         })
       }
@@ -2015,7 +2041,12 @@ async function* queryLoop(
 
     queryCheckpoint('query_recursive_call')
     const next: State = {
-      messages: [...messagesForQuery, ...assistantMessages, ...toolResults],
+      messages: [
+        ...messagesForQuery,
+        ...assistantMessages,
+        ...toolResults,
+        ...snipBoundaryMessages,
+      ],
       toolUseContext: toolUseContextWithQueryTracking,
       autoCompactTracking: tracking,
       turnCount: nextTurnCount,

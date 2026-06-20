@@ -74,7 +74,7 @@ Guidelines:
     return {
       tool_use_id: toolUseID,
       type: 'tool_result',
-      content: `Snipped ${content.snipped_count} messages. Summary: ${content.summary}`,
+      content: `Snipped ${content.snipped_count} messages. A summary of removed content will appear in the next turn.`,
     }
   },
 
