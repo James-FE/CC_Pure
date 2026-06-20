@@ -19,14 +19,53 @@ import type {
   StdinMessageSchema,
 } from './controlSchemas.js'
 import type { SDKPartialAssistantMessageSchema } from './coreSchemas.js'
+import type { HookInput } from './coreTypes.js'
 
-export type SDKControlRequest = z.infer<
-  ReturnType<typeof SDKControlRequestSchema>
+type SDKControlRequestInnerRaw = z.infer<
+  ReturnType<typeof SDKControlRequestInnerSchema>
 >
-export type SDKControlResponse = z.infer<
+
+type SDKControlRequestRaw = z.infer<ReturnType<typeof SDKControlRequestSchema>>
+
+type SDKControlResponseRaw = z.infer<
   ReturnType<typeof SDKControlResponseSchema>
 >
-export type StdoutMessage = z.infer<ReturnType<typeof StdoutMessageSchema>>
+
+type SDKControlRequestWithHookInput<T> = T extends {
+  subtype: 'hook_callback'
+}
+  ? Omit<T, 'input'> & { input: HookInput }
+  : T
+
+type SDKControlResponsePayloadWithHookInput<T> = T extends {
+  subtype: 'error'
+}
+  ? Omit<T, 'pending_permission_requests'> & {
+      pending_permission_requests?: SDKControlRequest[]
+    }
+  : T
+
+type NonControlMessage<T> = T extends {
+  type: 'control_request' | 'control_response'
+}
+  ? never
+  : T
+
+export type SDKControlRequestInner =
+  SDKControlRequestWithHookInput<SDKControlRequestInnerRaw>
+
+export type SDKControlRequest = Omit<SDKControlRequestRaw, 'request'> & {
+  request: SDKControlRequestInner
+}
+export type SDKControlResponse = Omit<SDKControlResponseRaw, 'response'> & {
+  response: SDKControlResponsePayloadWithHookInput<
+    SDKControlResponseRaw['response']
+  >
+}
+export type StdoutMessage =
+  | NonControlMessage<z.infer<ReturnType<typeof StdoutMessageSchema>>>
+  | SDKControlRequest
+  | SDKControlResponse
 export type SDKControlInitializeRequest = z.infer<
   ReturnType<typeof SDKControlInitializeRequestSchema>
 >
@@ -39,7 +78,10 @@ export type SDKControlMcpSetServersResponse = z.infer<
 export type SDKControlReloadPluginsResponse = z.infer<
   ReturnType<typeof SDKControlReloadPluginsResponseSchema>
 >
-export type StdinMessage = z.infer<ReturnType<typeof StdinMessageSchema>>
+export type StdinMessage =
+  | NonControlMessage<z.infer<ReturnType<typeof StdinMessageSchema>>>
+  | SDKControlRequest
+  | SDKControlResponse
 export type SDKPartialAssistantMessage = z.infer<
   ReturnType<typeof SDKPartialAssistantMessageSchema>
 >
@@ -48,7 +90,4 @@ export type SDKControlPermissionRequest = z.infer<
 >
 export type SDKControlCancelRequest = z.infer<
   ReturnType<typeof SDKControlCancelRequestSchema>
->
-export type SDKControlRequestInner = z.infer<
-  ReturnType<typeof SDKControlRequestInnerSchema>
 >
