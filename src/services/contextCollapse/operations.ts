@@ -1,5 +1,7 @@
 import { randomUUID } from 'crypto'
+import type { ContextCollapseCommitEntry } from 'src/types/logs.js'
 import type { Message } from 'src/types/message.js'
+import { getRestoredCommits } from './persist.js'
 
 /**
  * Strategy used to collapse a message span.
@@ -97,6 +99,54 @@ function isProjectableEntry(
   )
 }
 
+function commitToSpan(
+  messages: Message[],
+  commit: ContextCollapseCommitEntry,
+): CollapseEntry | undefined {
+  const startIdx = messages.findIndex(
+    message => message.uuid === commit.firstArchivedUuid,
+  )
+  const endIdx = messages.findIndex(
+    message => message.uuid === commit.lastArchivedUuid,
+  )
+
+  if (startIdx === -1 || endIdx === -1 || startIdx > endIdx) {
+    return undefined
+  }
+
+  const endTimestamp = messages[endIdx]?.timestamp
+  const startTimestamp = messages[startIdx]?.timestamp
+
+  return {
+    id: commit.collapseId,
+    span: {
+      startIdx,
+      endIdx,
+      messageIds: messages
+        .slice(startIdx, endIdx + 1)
+        .map(message => message.uuid),
+    },
+    replacement: {
+      text: commit.summary,
+      tokens: 0,
+    },
+    createdAt:
+      typeof endTimestamp === 'string'
+        ? endTimestamp
+        : typeof startTimestamp === 'string'
+          ? startTimestamp
+          : new Date(0).toISOString(),
+    depth: 0,
+    parentId: null,
+    meta: {
+      messageCount: endIdx - startIdx + 1,
+      tokensIn: 0,
+      tokensOut: 0,
+      strategy: 'llm-summary',
+    },
+  }
+}
+
 /**
  * Projects messages through a collapse commit log, returning a filtered
  * view where collapsed spans are replaced by summary messages.
@@ -118,10 +168,16 @@ export function projectView(
   messages: Message[],
   collapseLog?: CollapseEntry[],
 ): Message[] {
-  if (!collapseLog || collapseLog.length === 0) return messages
+  const effectiveCollapseLog =
+    collapseLog ??
+    getRestoredCommits()
+      .map(commit => commitToSpan(messages, commit))
+      .filter(entry => entry !== undefined)
+
+  if (effectiveCollapseLog.length === 0) return messages
 
   // Sort by startIdx ascending so later collapses don't break earlier indices
-  const sorted = collapseLog
+  const sorted = effectiveCollapseLog
     .filter(entry => isProjectableEntry(entry, messages.length))
     .sort((a, b) => a.span.startIdx - b.span.startIdx)
 
