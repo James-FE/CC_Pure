@@ -32,7 +32,7 @@ export function isSnipMarkerMessage(message: Message): boolean {
  * This is a rough heuristic (~4 chars per token) used to report
  * tokensFreed; it does not need to be exact.
  */
-function estimateMessageTokens(message: Message): number {
+export function estimateMessageTokens(message: Message): number {
   const content = message.message?.content
   let chars = 0
   if (typeof content === 'string') {
@@ -55,6 +55,33 @@ function estimateMessageTokens(message: Message): number {
     chars = JSON.stringify(content).length
   }
   return Math.max(1, Math.ceil(chars / CHARS_PER_TOKEN))
+}
+
+export function findSnipBoundary(messages: Message[]):
+  | {
+      index: number
+      removedUuids: string[]
+      boundaryMessage: Message
+    }
+  | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]!
+    if (
+      msg.type === 'system' &&
+      (msg as Record<string, unknown>).subtype === 'snip_boundary'
+    ) {
+      const meta = (msg as { snipMetadata?: { removedUuids?: unknown } })
+        .snipMetadata
+      if (Array.isArray(meta?.removedUuids)) {
+        return {
+          index: i,
+          removedUuids: meta.removedUuids,
+          boundaryMessage: msg,
+        }
+      }
+    }
+  }
+  return undefined
 }
 
 /**
@@ -89,33 +116,16 @@ export function snipCompactIfNeeded(
   tokensFreed: number
   boundaryMessage?: Message
 } {
-  // Find the last snip_boundary message
-  let boundaryIdx = -1
-  let removedUuids: string[] | undefined
+  const boundary = findSnipBoundary(messages)
 
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const msg = messages[i]!
-    if (
-      msg.type === 'system' &&
-      (msg as Record<string, unknown>).subtype === 'snip_boundary'
-    ) {
-      boundaryIdx = i
-      const meta = (msg as Record<string, unknown>).snipMetadata as
-        | { removedUuids?: string[] }
-        | undefined
-      removedUuids = meta?.removedUuids
-      break
-    }
-  }
-
-  if (boundaryIdx === -1) {
+  if (!boundary) {
     return { messages, executed: false, tokensFreed: 0 }
   }
 
-  const boundaryMessage = messages[boundaryIdx]!
+  const { boundaryMessage, index: boundaryIdx, removedUuids } = boundary
 
-  // No removedUuids metadata — fallback: keep boundary + everything after
-  if (!removedUuids || removedUuids.length === 0) {
+  // Empty removedUuids metadata — fallback: keep boundary + everything after
+  if (removedUuids.length === 0) {
     const kept = messages.slice(boundaryIdx)
     return {
       messages: kept,
