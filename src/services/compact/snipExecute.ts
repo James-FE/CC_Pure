@@ -53,19 +53,25 @@ export async function executeSnip(
     String(message.uuid),
   )
 
-  if (removedUuids.length === 0) return undefined
+  if (removedUuids.length === 0) {
+    const missingMessageIds = args.messageIds
+    return {
+      type: 'system',
+      uuid: randomUUID(),
+      subtype: 'snip_failed',
+      missingMessageIds,
+      message: {
+        role: 'system',
+        content: `Snip failed: no requested message IDs were found: ${missingMessageIds.join(', ')}`,
+      },
+      timestamp: new Date().toISOString(),
+    } as Message
+  }
 
   let removedTokens = 0
   for (const message of closedRemovedMessages) {
     removedTokens += estimateMessageTokens(message)
   }
-  if (removedTokens < MIN_REMOVED_TOKENS) return undefined
-
-  const summaryMaxTokens = Math.min(
-    MAX_SUMMARY_TOKENS,
-    Math.floor(removedTokens * 0.5),
-    args.haikuOptions.maxTokens,
-  )
 
   const deterministicFallback = () => {
     const count = removedUuids.length
@@ -78,28 +84,38 @@ export async function executeSnip(
   }
 
   let summary: string
-  try {
-    /* eslint-disable @typescript-eslint/no-require-imports */
-    const { queryHaiku } =
-      require('src/services/api/claude.js') as typeof import('src/services/api/claude.js')
-    /* eslint-enable @typescript-eslint/no-require-imports */
-    const response = await queryHaiku({
-      systemPrompt: asSystemPrompt(args.haikuOptions.systemPrompt),
-      userPrompt: renderExchangesForSummary(closedRemovedMessages),
-      signal: args.signal,
-      options: {
-        querySource: 'snip_summary_generation',
-        enablePromptCaching: false,
-        agents: [],
-        isNonInteractiveSession: true,
-        hasAppendSystemPrompt: false,
-        mcpTools: [],
-        maxOutputTokensOverride: summaryMaxTokens,
-      },
-    })
-    summary = extractTextContent(response) || deterministicFallback()
-  } catch {
+  if (removedTokens < MIN_REMOVED_TOKENS) {
     summary = deterministicFallback()
+  } else {
+    const summaryMaxTokens = Math.min(
+      MAX_SUMMARY_TOKENS,
+      Math.floor(removedTokens * 0.5),
+      args.haikuOptions.maxTokens,
+    )
+
+    try {
+      /* eslint-disable @typescript-eslint/no-require-imports */
+      const { queryHaiku } =
+        require('src/services/api/claude.js') as typeof import('src/services/api/claude.js')
+      /* eslint-enable @typescript-eslint/no-require-imports */
+      const response = await queryHaiku({
+        systemPrompt: asSystemPrompt(args.haikuOptions.systemPrompt),
+        userPrompt: renderExchangesForSummary(closedRemovedMessages),
+        signal: args.signal,
+        options: {
+          querySource: 'snip_summary_generation',
+          enablePromptCaching: false,
+          agents: [],
+          isNonInteractiveSession: true,
+          hasAppendSystemPrompt: false,
+          mcpTools: [],
+          maxOutputTokensOverride: summaryMaxTokens,
+        },
+      })
+      summary = extractTextContent(response) || deterministicFallback()
+    } catch {
+      summary = deterministicFallback()
+    }
   }
 
   return {

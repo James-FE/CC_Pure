@@ -74,7 +74,7 @@ Guidelines:
     return {
       tool_use_id: toolUseID,
       type: 'tool_result',
-      content: `Snipped ${content.snipped_count} messages. A summary of removed content will appear in the next turn.`,
+      content: `Registered ${content.snipped_count} message${content.snipped_count === 1 ? '' : 's'} for snipping; they will be collapsed into a summary shortly.`,
     }
   },
 
@@ -85,7 +85,9 @@ Guidelines:
     return {
       data: {
         snipped_count: input.message_ids.length,
-        summary: input.reason ?? `Snipped ${input.message_ids.length} messages`,
+        summary:
+          input.reason ??
+          `Registered ${input.message_ids.length} message${input.message_ids.length === 1 ? '' : 's'} for snipping`,
       },
     }
   },

@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { describe, expect, mock, test } from 'bun:test'
 import type { UUID } from 'crypto'
+import { SnipTool } from '@claude-code-best/builtin-tools/tools/SnipTool/SnipTool.js'
 import type { Message } from 'src/types/message.js'
 import { asSystemPrompt } from 'src/utils/systemPromptType.js'
 import {
@@ -111,8 +112,17 @@ describe('executeSnip', () => {
     )
   })
 
-  test('skips snips below the removed token threshold', async () => {
+  test('creates a fallback boundary for snips below the removed token threshold', async () => {
     const message = makeMessage('too small')
+    const queryHaiku = mock(async () => ({
+      type: 'assistant',
+      uuid: randomUUID() as UUID,
+      message: {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Should not be called' }],
+      },
+    }))
+    mock.module('src/services/api/claude.js', () => ({ queryHaiku }))
 
     const boundary = await executeSnip({
       messageIds: [message.uuid],
@@ -121,7 +131,47 @@ describe('executeSnip', () => {
       haikuOptions: { systemPrompt: asSystemPrompt([]), maxTokens: 512 },
     })
 
-    expect(boundary).toBeUndefined()
+    expect(boundary).toMatchObject({
+      type: 'system',
+      subtype: 'snip_boundary',
+      messageCount: 1,
+      tokenCount: 3,
+    })
+    expect(boundary?.summary).toContain('Snipped 1 messages')
+    expect(boundary?.snipMetadata).toEqual({ removedUuids: [message.uuid] })
+    expect(queryHaiku).toHaveBeenCalledTimes(0)
+  })
+
+  test('returns a snip_failed notice when no message IDs match', async () => {
+    const missingIds = ['missing-a', 'missing-b']
+    const queryHaiku = mock(async () => ({
+      type: 'assistant',
+      uuid: randomUUID() as UUID,
+      message: {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Should not be called' }],
+      },
+    }))
+    mock.module('src/services/api/claude.js', () => ({ queryHaiku }))
+
+    const notice = await executeSnip({
+      messageIds: missingIds,
+      store: [makeMessage('keep me')],
+      signal: new AbortController().signal,
+      haikuOptions: { systemPrompt: asSystemPrompt([]), maxTokens: 512 },
+    })
+
+    expect(notice).toMatchObject({
+      type: 'system',
+      subtype: 'snip_failed',
+      missingMessageIds: missingIds,
+      message: {
+        role: 'system',
+        content:
+          'Snip failed: no requested message IDs were found: missing-a, missing-b',
+      },
+    })
+    expect(queryHaiku).toHaveBeenCalledTimes(0)
   })
 
   test('removes matching tool_result carrier when snipping an exchange with tool_use', async () => {
@@ -224,5 +274,19 @@ describe('maybeExecuteSnipFromToolResult', () => {
       messageCount: 1,
     })
     expect(boundary?.snipMetadata).toEqual({ removedUuids: [target.uuid] })
+  })
+})
+
+describe('SnipTool', () => {
+  test('reports registration instead of completed deletion', () => {
+    const result = SnipTool.mapToolResultToToolResultBlockParam(
+      { snipped_count: 2, summary: 'trim old context' },
+      'toolu_snip',
+    )
+
+    expect(result.content).toBe(
+      'Registered 2 messages for snipping; they will be collapsed into a summary shortly.',
+    )
+    expect(String(result.content)).not.toContain('Snipped')
   })
 })
