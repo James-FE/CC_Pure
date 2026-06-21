@@ -582,6 +582,31 @@ describe('applySlidingWindow', () => {
     expect(entry.firstArchivedUuid).toBe(old.uuid)
     expect(entry.lastArchivedUuid).toBe(old.uuid)
   })
+
+  test('preserves tool_use/tool_result pairs', () => {
+    const old = makeMessage('1', 10_000)
+    const toolUse = makeAssistantMessage([
+      {
+        type: 'tool_use',
+        id: 'toolu_1',
+        name: 'Read',
+        input: { file_path: 'src/index.ts' },
+      },
+    ])
+    toolUse.tokenEstimate = 1
+    const toolResult = makeMessage('3', 20_000)
+    toolResult.message.content = [
+      { type: 'tool_result', tool_use_id: 'toolu_1', content: 'ok' },
+    ] as never
+    const finalUser = makeMessage('4', 1)
+    const messages = [old, toolUse, toolResult, finalUser]
+
+    expect(scheduler.__testing.applySlidingWindow(messages)).toBe(1)
+
+    const entry = store.getCommittedLog()[0]!.entry
+    expect(entry.firstArchivedUuid).toBe(old.uuid)
+    expect(entry.lastArchivedUuid).toBe(toolResult.uuid)
+  })
 })
 
 describe('spawnCtxAgent', () => {

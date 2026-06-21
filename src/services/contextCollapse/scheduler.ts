@@ -246,6 +246,61 @@ function applySlidingWindow(messages: Message[]): number {
     }
   }
 
+  let pairBoundaryChanged = true
+  while (pairBoundaryChanged) {
+    pairBoundaryChanged = false
+    const keptToolUses = new Set<string>()
+    const keptToolResults = new Set<string>()
+
+    for (let i = keepStartIdx; i < messages.length; i++) {
+      const content = messages[i]!.message?.content
+      if (!Array.isArray(content)) continue
+
+      for (const block of content) {
+        if (typeof block !== 'object' || block === null) continue
+        const record = block as Record<string, unknown>
+        if (record.type === 'tool_use' && typeof record.id === 'string') {
+          keptToolUses.add(record.id)
+        }
+        if (
+          record.type === 'tool_result' &&
+          typeof record.tool_use_id === 'string'
+        ) {
+          keptToolResults.add(record.tool_use_id)
+        }
+      }
+    }
+
+    for (let i = keepStartIdx; i < messages.length; i++) {
+      const content = messages[i]!.message?.content
+      if (!Array.isArray(content)) continue
+
+      for (const block of content) {
+        if (typeof block !== 'object' || block === null) continue
+        const record = block as Record<string, unknown>
+        if (
+          record.type === 'tool_result' &&
+          typeof record.tool_use_id === 'string' &&
+          !keptToolUses.has(record.tool_use_id)
+        ) {
+          keepStartIdx = i + 1
+          pairBoundaryChanged = true
+          break
+        }
+        if (
+          record.type === 'tool_use' &&
+          typeof record.id === 'string' &&
+          !keptToolResults.has(record.id)
+        ) {
+          keepStartIdx = i + 1
+          pairBoundaryChanged = true
+          break
+        }
+      }
+      if (pairBoundaryChanged) break
+    }
+  }
+
   const cutIdx = keepStartIdx - 1
   if (cutIdx < 0) return 0
 
