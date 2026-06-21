@@ -49,6 +49,7 @@ const MIN_SPAN_TOKENS = 2_000
 const EMPTY_SPAWN_WARN_AT = 3
 const MARBLE_QUERY_SOURCE = 'marble_origami'
 const CTX_AGENT_SUMMARY_MAX_TOKENS = 512
+const RISK_COMMIT_CEILING = 0.7
 const CTX_AGENT_FALLBACK_RISK = 0.5
 const CTX_AGENT_MESSAGE_CHAR_LIMIT = 500
 const CTX_AGENT_SYSTEM_PROMPT = [
@@ -85,6 +86,9 @@ type CtxAgentVerdict = {
 type CollapseContext = {
   options?: {
     mainLoopModel?: string
+  }
+  abortController?: {
+    signal: AbortSignal
   }
 }
 
@@ -506,18 +510,30 @@ async function summarizeCandidate(
 
 async function spawnCtxAgent(
   view: Message[],
-  _ctx: CollapseContext,
+  ctx: CollapseContext,
 ): Promise<void> {
   const candidate = selectStagingCandidate(view)
-  if (candidate && !overlapsExistingStaged(candidate, view)) {
-    pushStaged({
-      ...candidate,
-      stagedAt: Date.now(),
-    })
+  if (!candidate || overlapsExistingStaged(candidate, view)) {
+    recordEmptySpawn()
     return
   }
 
-  recordEmptySpawn()
+  const verdict = ctx.abortController
+    ? await summarizeCandidate(view, candidate, ctx.abortController.signal)
+    : undefined
+
+  if (verdict && verdict.risk > RISK_COMMIT_CEILING) {
+    recordEmptySpawn()
+    return
+  }
+
+  pushStaged({
+    startUuid: candidate.startUuid,
+    endUuid: candidate.endUuid,
+    summary: verdict?.summary ?? candidate.summary,
+    risk: verdict?.risk ?? candidate.risk,
+    stagedAt: Date.now(),
+  })
 }
 
 function maybeWarnEmptySpawn(): void {

@@ -568,6 +568,28 @@ describe('spawnCtxAgent', () => {
     expect(typeof store.getStaged()[0]!.stagedAt).toBe('number')
   })
 
+  test('uses a Haiku verdict when an abort signal is available', async () => {
+    const messages = [
+      makeMessage('1', 1_500),
+      makeMessage('2', 1_000),
+      makeMessage('3', 20_000),
+      makeMessage('4', 5_000),
+    ]
+
+    await scheduler.__testing.spawnCtxAgent(messages, {
+      abortController: new AbortController(),
+    })
+
+    expect(queryHaikuMock).toHaveBeenCalledTimes(1)
+    expect(store.getStaged()).toHaveLength(1)
+    expect(store.getStaged()[0]).toMatchObject({
+      startUuid: messages[0]!.uuid,
+      endUuid: messages[1]!.uuid,
+      summary: 'model',
+      risk: 0.2,
+    })
+  })
+
   test('records an empty spawn when no candidate exists', async () => {
     await scheduler.__testing.spawnCtxAgent([], {})
 
