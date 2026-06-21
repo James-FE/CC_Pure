@@ -548,16 +548,21 @@ describe('commitSpans', () => {
 })
 
 describe('spawnCtxAgent', () => {
-  test('pushes a staged span when a non-overlapping candidate exists', async () => {
-    const messages = [
+  function makeSpawnMessages(): Message[] {
+    return [
       makeMessage('1', 1_500),
       makeMessage('2', 1_000),
       makeMessage('3', 20_000),
       makeMessage('4', 5_000),
     ]
+  }
+
+  test('uses the deterministic fallback without a signal and does not call queryHaiku', async () => {
+    const messages = makeSpawnMessages()
 
     await scheduler.__testing.spawnCtxAgent(messages, {})
 
+    expect(queryHaikuMock).not.toHaveBeenCalled()
     expect(store.getStaged()).toHaveLength(1)
     expect(store.getStaged()[0]).toMatchObject({
       startUuid: messages[0]!.uuid,
@@ -568,13 +573,8 @@ describe('spawnCtxAgent', () => {
     expect(typeof store.getStaged()[0]!.stagedAt).toBe('number')
   })
 
-  test('uses a Haiku verdict when an abort signal is available', async () => {
-    const messages = [
-      makeMessage('1', 1_500),
-      makeMessage('2', 1_000),
-      makeMessage('3', 20_000),
-      makeMessage('4', 5_000),
-    ]
+  test('stages the model summary when queryHaiku returns a valid verdict', async () => {
+    const messages = makeSpawnMessages()
 
     await scheduler.__testing.spawnCtxAgent(messages, {
       abortController: new AbortController(),
@@ -590,26 +590,47 @@ describe('spawnCtxAgent', () => {
     })
   })
 
-  test('records an empty spawn when no candidate exists', async () => {
-    await scheduler.__testing.spawnCtxAgent([], {})
+  test('falls back to the placeholder summary when queryHaiku throws', async () => {
+    queryHaikuMock.mockImplementation(async () => {
+      throw new Error('network down')
+    })
+    const messages = makeSpawnMessages()
+
+    await scheduler.__testing.spawnCtxAgent(messages, {
+      abortController: new AbortController(),
+    })
+
+    expect(queryHaikuMock).toHaveBeenCalledTimes(1)
+    expect(store.getStaged()).toHaveLength(1)
+    expect(store.getStaged()[0]).toMatchObject({
+      startUuid: messages[0]!.uuid,
+      endUuid: messages[1]!.uuid,
+      summary: 'Collapsed 2 messages.',
+      risk: 0.5,
+    })
+  })
+
+  test('records an empty spawn and stages nothing when the verdict risk is too high', async () => {
+    queryHaikuMock.mockImplementation(async () =>
+      makeAssistantMessage([
+        { type: 'text', text: '{"summary":"too risky","risk":0.8}' },
+      ]),
+    )
+    const messages = makeSpawnMessages()
+
+    await scheduler.__testing.spawnCtxAgent(messages, {
+      abortController: new AbortController(),
+    })
 
     expect(store.getHealth().totalEmptySpawns).toBe(1)
     expect(store.getStaged()).toEqual([])
   })
 
-  test('records an empty spawn when the candidate overlaps an existing staged span', async () => {
-    const messages = [
-      makeMessage('1', 1_500),
-      makeMessage('2', 1_000),
-      makeMessage('3', 20_000),
-      makeMessage('4', 5_000),
-    ]
-    store.pushStaged(stagedSpan(messages[0]!.uuid, messages[1]!.uuid))
-
-    await scheduler.__testing.spawnCtxAgent(messages, {})
+  test('records an empty spawn when no candidate exists', async () => {
+    await scheduler.__testing.spawnCtxAgent([], {})
 
     expect(store.getHealth().totalEmptySpawns).toBe(1)
-    expect(store.getStaged()).toHaveLength(1)
+    expect(store.getStaged()).toEqual([])
   })
 })
 
