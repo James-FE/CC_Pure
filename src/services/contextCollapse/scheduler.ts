@@ -12,8 +12,8 @@ import {
 } from 'src/utils/sessionStorage.js'
 import { tokenCountWithEstimation } from 'src/utils/tokens.js'
 import {
-  commitToSpan,
   createSummaryMessage,
+  type CollapseEntry,
   projectView,
 } from './operations.js'
 import {
@@ -86,11 +86,96 @@ export function isWithheldPromptTooLong(
 }
 
 function commitSpans(
-  _messages: Message[],
-  _spans: StagedSpan[],
-  _strategy: CollapseStrategy,
+  messages: Message[],
+  spans: StagedSpan[],
+  strategy: CollapseStrategy,
 ): number {
-  return 0
+  recordSpawn()
+  let committed = 0
+
+  for (const span of spans) {
+    const startIdx = messages.findIndex(
+      message => message.uuid === span.startUuid,
+    )
+    const endIdx = messages.findIndex(message => message.uuid === span.endUuid)
+    if (startIdx === -1 || endIdx === -1 || startIdx > endIdx) continue
+
+    const archived = messages.slice(startIdx, endIdx + 1)
+    const collapseId = nextCollapseId()
+    const summaryUuid = randomUUID()
+    const summaryContent = `<collapsed id="${collapseId}">${span.summary}</collapsed>`
+    const { depth, parentId } = detectNesting(messages, startIdx, endIdx)
+    const tokensIn = tokenCountWithEstimation(archived)
+
+    const entry: ContextCollapseCommitEntry = {
+      type: 'marble-origami-commit',
+      sessionId: getSessionId() as ContextCollapseCommitEntry['sessionId'],
+      collapseId,
+      summaryUuid,
+      summaryContent,
+      summary: span.summary,
+      firstArchivedUuid: span.startUuid,
+      lastArchivedUuid: span.endUuid,
+      depth,
+      parentId,
+      tokensIn,
+      tokensOut: 0,
+      strategy,
+    }
+
+    const projected = collapseEntryFromCommit(messages, entry, startIdx, endIdx)
+    entry.tokensOut = tokenCountWithEstimation([
+      createSummaryMessage(projected),
+    ])
+
+    registerSummary(summaryUuid, collapseId)
+    pushCommitted(entry)
+    void recordContextCollapseCommit(entry)
+    committed += 1
+  }
+
+  return committed
+}
+
+function collapseEntryFromCommit(
+  messages: Message[],
+  entry: ContextCollapseCommitEntry,
+  startIdx: number,
+  endIdx: number,
+): CollapseEntry {
+  const endTimestamp = messages[endIdx]?.timestamp
+  const startTimestamp = messages[startIdx]?.timestamp
+
+  return {
+    id: entry.collapseId,
+    summaryUuid: entry.summaryUuid,
+    summaryContent: entry.summaryContent,
+    span: {
+      startIdx,
+      endIdx,
+      messageIds: messages
+        .slice(startIdx, endIdx + 1)
+        .map(message => message.uuid),
+    },
+    replacement: {
+      text: entry.summary,
+      tokens: entry.tokensOut ?? 0,
+    },
+    createdAt:
+      typeof endTimestamp === 'string'
+        ? endTimestamp
+        : typeof startTimestamp === 'string'
+          ? startTimestamp
+          : new Date(0).toISOString(),
+    depth: entry.depth ?? 0,
+    parentId: entry.parentId ?? null,
+    meta: {
+      messageCount: endIdx - startIdx + 1,
+      tokensIn: entry.tokensIn ?? 0,
+      tokensOut: entry.tokensOut ?? 0,
+      strategy: entry.strategy ?? 'llm-summary',
+    },
+  }
 }
 
 function selectStagingCandidate(view: Message[]): Candidate | undefined {

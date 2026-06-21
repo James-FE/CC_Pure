@@ -288,3 +288,89 @@ describe('selectStagingCandidate', () => {
     })
   })
 })
+
+describe('commitSpans', () => {
+  test('returns zero for an empty span list', () => {
+    const messages = [makeMessage('1')]
+
+    expect(scheduler.__testing.commitSpans(messages, [], 'llm-summary')).toBe(0)
+    expect(store.getCommittedLog()).toEqual([])
+  })
+
+  test('commits a valid span and registers the summary', () => {
+    const messages = [makeMessage('1', 1_000), makeMessage('2', 1_200)]
+    const span = stagedSpan(messages[0]!.uuid, messages[1]!.uuid)
+
+    expect(
+      scheduler.__testing.commitSpans(messages, [span], 'llm-summary'),
+    ).toBe(1)
+
+    const entry = store.getCommittedLog()[0]!.entry
+    expect(entry).toMatchObject({
+      type: 'marble-origami-commit',
+      sessionId: '00000000-0000-4000-8000-000000000001',
+      collapseId: '0000000000000001',
+      summaryContent: '<collapsed id="0000000000000001">summary</collapsed>',
+      summary: 'summary',
+      firstArchivedUuid: messages[0]!.uuid,
+      lastArchivedUuid: messages[1]!.uuid,
+      depth: 0,
+      parentId: null,
+      tokensIn: 2_200,
+      tokensOut: 1,
+      strategy: 'llm-summary',
+    })
+    expect(registry.getCollapseIdForSummary(entry.summaryUuid)).toBe(
+      entry.collapseId,
+    )
+    expect(recordContextCollapseCommitMock).toHaveBeenCalledWith(entry)
+  })
+
+  test('skips spans whose boundaries cannot be resolved', () => {
+    const messages = [makeMessage('1'), makeMessage('2')]
+
+    expect(
+      scheduler.__testing.commitSpans(
+        messages,
+        [stagedSpan('missing', messages[1]!.uuid)],
+        'llm-summary',
+      ),
+    ).toBe(0)
+
+    expect(store.getCommittedLog()).toEqual([])
+    expect(recordContextCollapseCommitMock).not.toHaveBeenCalled()
+  })
+
+  test('records one spawn outside the span loop', () => {
+    const messages = [
+      makeMessage('1', 1_000),
+      makeMessage('2', 1_000),
+      makeMessage('3', 1_000),
+      makeMessage('4', 1_000),
+    ]
+
+    expect(
+      scheduler.__testing.commitSpans(
+        messages,
+        [
+          stagedSpan(messages[0]!.uuid, messages[1]!.uuid),
+          stagedSpan(messages[2]!.uuid, messages[3]!.uuid),
+        ],
+        'truncate',
+      ),
+    ).toBe(2)
+
+    expect(store.getHealth().totalSpawns).toBe(1)
+    expect(store.getCommittedLog()).toHaveLength(2)
+  })
+
+  test('writes estimated output tokens and the supplied strategy', () => {
+    const messages = [makeMessage('1', 2_000), makeMessage('2', 500)]
+    const span = stagedSpan(messages[0]!.uuid, messages[1]!.uuid)
+
+    scheduler.__testing.commitSpans(messages, [span], 'truncate')
+
+    expect(store.getCommittedLog()[0]!.entry.tokensOut).toBe(1)
+    expect(store.getCommittedLog()[0]!.entry.strategy).toBe('truncate')
+  })
+})
