@@ -278,9 +278,20 @@ function overlapsExistingStaged(
 }
 
 async function spawnCtxAgent(
-  _view: Message[],
+  view: Message[],
   _ctx: CollapseContext,
-): Promise<void> {}
+): Promise<void> {
+  const candidate = selectStagingCandidate(view)
+  if (candidate && !overlapsExistingStaged(candidate, view)) {
+    pushStaged({
+      ...candidate,
+      stagedAt: Date.now(),
+    })
+    return
+  }
+
+  recordEmptySpawn()
+}
 
 function maybeWarnEmptySpawn(): void {
   const health = getHealth()

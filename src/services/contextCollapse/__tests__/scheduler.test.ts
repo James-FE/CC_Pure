@@ -374,3 +374,47 @@ describe('commitSpans', () => {
     expect(store.getCommittedLog()[0]!.entry.strategy).toBe('truncate')
   })
 })
+
+describe('spawnCtxAgent', () => {
+  test('pushes a staged span when a non-overlapping candidate exists', async () => {
+    const messages = [
+      makeMessage('1', 1_500),
+      makeMessage('2', 1_000),
+      makeMessage('3', 20_000),
+      makeMessage('4', 5_000),
+    ]
+
+    await scheduler.__testing.spawnCtxAgent(messages, {})
+
+    expect(store.getStaged()).toHaveLength(1)
+    expect(store.getStaged()[0]).toMatchObject({
+      startUuid: messages[0]!.uuid,
+      endUuid: messages[1]!.uuid,
+      summary: 'Collapsed 2 messages.',
+      risk: 2_500,
+    })
+    expect(typeof store.getStaged()[0]!.stagedAt).toBe('number')
+  })
+
+  test('records an empty spawn when no candidate exists', async () => {
+    await scheduler.__testing.spawnCtxAgent([], {})
+
+    expect(store.getHealth().totalEmptySpawns).toBe(1)
+    expect(store.getStaged()).toEqual([])
+  })
+
+  test('records an empty spawn when the candidate overlaps an existing staged span', async () => {
+    const messages = [
+      makeMessage('1', 1_500),
+      makeMessage('2', 1_000),
+      makeMessage('3', 20_000),
+      makeMessage('4', 5_000),
+    ]
+    store.pushStaged(stagedSpan(messages[0]!.uuid, messages[1]!.uuid))
+
+    await scheduler.__testing.spawnCtxAgent(messages, {})
+
+    expect(store.getHealth().totalEmptySpawns).toBe(1)
+    expect(store.getStaged()).toHaveLength(1)
+  })
+})
