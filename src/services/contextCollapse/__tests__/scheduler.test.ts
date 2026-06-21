@@ -146,6 +146,41 @@ describe('renderSpanForSummary', () => {
   })
 })
 
+describe('parseVerdict', () => {
+  test('parses a valid summary and risk JSON object', () => {
+    expect(
+      scheduler.__testing.parseVerdict('{"summary":"x","risk":0.3}'),
+    ).toEqual({
+      summary: 'x',
+      risk: 0.3,
+    })
+  })
+
+  test('returns undefined for invalid JSON', () => {
+    expect(scheduler.__testing.parseVerdict('{bad json')).toBeUndefined()
+  })
+
+  test('returns undefined when required fields are missing', () => {
+    expect(scheduler.__testing.parseVerdict('{"summary":"x"}')).toBeUndefined()
+    expect(scheduler.__testing.parseVerdict('{"risk":0.3}')).toBeUndefined()
+  })
+
+  test('clamps risk into the supported range', () => {
+    expect(
+      scheduler.__testing.parseVerdict('{"summary":"x","risk":1.3}'),
+    ).toEqual({
+      summary: 'x',
+      risk: 1,
+    })
+    expect(
+      scheduler.__testing.parseVerdict('{"summary":"x","risk":-0.2}'),
+    ).toEqual({
+      summary: 'x',
+      risk: 0,
+    })
+  })
+})
+
 describe('maybeWarnEmptySpawn', () => {
   test('does not warn before the empty spawn threshold', () => {
     const warn = spyOn(console, 'warn').mockImplementation(() => {})

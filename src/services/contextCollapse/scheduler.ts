@@ -56,6 +56,10 @@ type Candidate = {
   summary: string
   risk: number
 }
+type CtxAgentVerdict = {
+  summary: string
+  risk: number
+}
 
 type CollapseContext = {
   options?: {
@@ -381,6 +385,27 @@ function renderSpanForSummary(span: Message[]): string {
     .join('\n')
 }
 
+function parseVerdict(raw: string): CtxAgentVerdict | undefined {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return undefined
+  }
+
+  if (typeof parsed !== 'object' || parsed === null) return undefined
+  const verdict = parsed as Record<string, unknown>
+  if (typeof verdict.summary !== 'string') return undefined
+  if (typeof verdict.risk !== 'number' || !Number.isFinite(verdict.risk)) {
+    return undefined
+  }
+
+  return {
+    summary: verdict.summary,
+    risk: Math.min(1, Math.max(0, verdict.risk)),
+  }
+}
+
 async function spawnCtxAgent(
   view: Message[],
   _ctx: CollapseContext,
@@ -425,6 +450,7 @@ export const __testing = {
   persistSnapshot,
   renderSpanForSummary,
   extractAssistantText,
+  parseVerdict,
   selectStagingCandidate,
   spawnCtxAgent,
 }
