@@ -269,7 +269,7 @@ function applySlidingWindow(messages: Message[]): number {
 
       for (const block of content) {
         if (typeof block !== 'object' || block === null) continue
-        const record = block as Record<string, unknown>
+        const record = block as unknown as Record<string, unknown>
         if (record.type === 'tool_use' && typeof record.id === 'string') {
           keptToolUses.add(record.id)
         }
@@ -288,7 +288,7 @@ function applySlidingWindow(messages: Message[]): number {
 
       for (const block of content) {
         if (typeof block !== 'object' || block === null) continue
-        const record = block as Record<string, unknown>
+        const record = block as unknown as Record<string, unknown>
         if (
           record.type === 'tool_result' &&
           typeof record.tool_use_id === 'string' &&
