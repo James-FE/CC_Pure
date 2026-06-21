@@ -503,3 +503,61 @@ describe('recoverFromOverflow', () => {
     expect(result).toEqual({ messages: [], committed: 0 })
   })
 })
+
+describe('applyCollapsesIfNeeded', () => {
+  test('short-circuits marble_origami queries', async () => {
+    const messages = [makeMessage('1', 200_000)]
+
+    await expect(
+      scheduler.applyCollapsesIfNeeded(messages, {}, 'marble_origami'),
+    ).resolves.toEqual({
+      messages,
+      committed: false,
+    })
+    expect(store.getCommittedLog()).toEqual([])
+  })
+
+  test('does not spawn below ninety percent and disarms the scheduler', async () => {
+    const messages = [makeMessage('1', 1_000)]
+    store.setArmed(true)
+
+    const result = await scheduler.applyCollapsesIfNeeded(messages, {}, 'main')
+
+    expect(result).toEqual({ messages, committed: false })
+    expect(store.getArmed()).toBe(false)
+    expect(store.getHealth().totalSpawns).toBe(0)
+  })
+
+  test('spawns and commits when tokens cross ninety percent while unarmed', async () => {
+    const messages = [makeMessage('1', 160_000), makeMessage('2', 25_000)]
+
+    const result = await scheduler.applyCollapsesIfNeeded(messages, {}, 'main')
+
+    expect(result.committed).toBe(true)
+    expect(store.getCommittedLog()).toHaveLength(1)
+    expect(store.getArmed()).toBe(true)
+    expect(store.getLastSpawnTokens()).toBe(185_000)
+  })
+
+  test('force spawns at ninety-five percent even when already armed', async () => {
+    const messages = [makeMessage('1', 165_000), makeMessage('2', 25_000)]
+    store.setArmed(true)
+    store.setLastSpawnTokens(190_000)
+
+    const result = await scheduler.applyCollapsesIfNeeded(messages, {}, 'main')
+
+    expect(result.committed).toBe(true)
+    expect(store.getCommittedLog()).toHaveLength(1)
+  })
+
+  test('spawns when the token interval advances by at least twelve thousand', async () => {
+    const messages = [makeMessage('1', 158_000), makeMessage('2', 25_000)]
+    store.setArmed(true)
+    store.setLastSpawnTokens(170_000)
+
+    const result = await scheduler.applyCollapsesIfNeeded(messages, {}, 'main')
+
+    expect(result.committed).toBe(true)
+    expect(store.getCommittedLog()).toHaveLength(1)
+  })
+})

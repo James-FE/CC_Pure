@@ -64,10 +64,50 @@ type CollapseContext = {
 
 export async function applyCollapsesIfNeeded(
   messages: Message[],
-  _ctx: CollapseContext,
-  _querySource?: string,
+  ctx: CollapseContext,
+  querySource?: string,
 ): Promise<ApplyResult> {
-  return { messages, committed: false }
+  if (querySource === MARBLE_QUERY_SOURCE) {
+    return { messages, committed: false }
+  }
+
+  let view = projectCommittedView(messages)
+  const model = ctx.options?.mainLoopModel ?? ''
+  const windowSize = getEffectiveContextWindowSize(model)
+  const tokens = tokenCountWithEstimation(view)
+
+  if (tokens < windowSize * COMMIT_START_FRAC) {
+    if (getArmed()) {
+      setArmed(false)
+      persistSnapshot()
+    }
+    return { messages: view, committed: false }
+  }
+
+  const shouldSpawn =
+    !getArmed() ||
+    tokens >= windowSize * BLOCKING_FRAC ||
+    tokens - getLastSpawnTokens() >= SPAWN_INTERVAL_TOKENS
+
+  if (shouldSpawn) {
+    try {
+      await spawnCtxAgent(view, ctx)
+    } catch (error) {
+      recordError(error instanceof Error ? error.message : String(error))
+    }
+    setArmed(true)
+    setLastSpawnTokens(tokens)
+    maybeWarnEmptySpawn()
+    persistSnapshot()
+  }
+
+  const committed = commitSpans(messages, drainStaged(), 'llm-summary')
+  if (committed > 0) {
+    view = projectCommittedView(messages)
+    persistSnapshot()
+  }
+
+  return { messages: view, committed: committed > 0 }
 }
 
 export function recoverFromOverflow(
