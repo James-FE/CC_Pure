@@ -230,7 +230,44 @@ function commitSpans(
 function applySlidingWindow(messages: Message[]): number {
   if (messages.length === 0) return 0
 
-  return 0
+  let retainedTokens = 0
+  let keepStartIdx = messages.length
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    retainedTokens += tokenCountWithEstimation([messages[i]!])
+    keepStartIdx = i
+    if (retainedTokens >= SLIDING_WINDOW_TARGET_TOKENS) break
+  }
+
+  const cutIdx = keepStartIdx - 1
+  if (cutIdx < 0) return 0
+
+  const collapseId = nextCollapseId()
+  const summaryUuid = randomUUID()
+  const archived = messages.slice(0, cutIdx + 1)
+  const entry: ContextCollapseCommitEntry = {
+    type: 'marble-origami-commit',
+    sessionId: getSessionId() as ContextCollapseCommitEntry['sessionId'],
+    collapseId,
+    summaryUuid,
+    summaryContent: '',
+    summary: '',
+    firstArchivedUuid: messages[0]!.uuid,
+    lastArchivedUuid: messages[cutIdx]!.uuid,
+    depth: 0,
+    parentId: null,
+    tokensIn: tokenCountWithEstimation(archived),
+    tokensOut: 0,
+    strategy: 'sliding-window',
+  }
+
+  const projected = collapseEntryFromCommit(messages, entry, 0, cutIdx)
+  projectView(messages, [projected])
+
+  registerSummary(summaryUuid, collapseId)
+  pushCommitted(entry)
+  void recordContextCollapseCommit(entry)
+  return 1
 }
 
 function collapseEntryFromCommit(

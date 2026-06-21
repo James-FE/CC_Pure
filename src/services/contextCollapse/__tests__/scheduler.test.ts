@@ -552,6 +552,22 @@ describe('applySlidingWindow', () => {
     expect(scheduler.__testing.applySlidingWindow([])).toBe(0)
     expect(store.getCommittedLog()).toEqual([])
   })
+
+  test('cuts early messages and retains tail under target tokens', () => {
+    const messages = [
+      makeMessage('1', 10_000),
+      makeMessage('2', 10_000),
+      makeMessage('3', 8_000),
+      makeMessage('4', 7_000),
+    ]
+
+    expect(scheduler.__testing.applySlidingWindow(messages)).toBe(1)
+
+    const entry = store.getCommittedLog()[0]!.entry
+    expect(entry.firstArchivedUuid).toBe(messages[0]!.uuid)
+    expect(entry.lastArchivedUuid).toBe(messages[1]!.uuid)
+    expect(entry.strategy).toBe('sliding-window')
+  })
 })
 
 describe('spawnCtxAgent', () => {
