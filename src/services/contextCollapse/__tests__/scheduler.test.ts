@@ -174,3 +174,73 @@ describe('detectNesting', () => {
     })
   })
 })
+
+describe('overlapsExistingStaged', () => {
+  test('returns false when candidate UUIDs cannot be resolved', () => {
+    const messages = ['1', '2', '3'].map(makeMessage)
+    store.pushStaged(stagedSpan(messages[0]!.uuid, messages[1]!.uuid))
+
+    expect(
+      scheduler.__testing.overlapsExistingStaged(
+        {
+          startUuid: 'missing-start',
+          endUuid: 'missing-end',
+          summary: 'summary',
+          risk: 1,
+        },
+        messages,
+      ),
+    ).toBe(false)
+  })
+
+  test('returns true when the candidate fully overlaps a staged span', () => {
+    const messages = ['1', '2', '3', '4'].map(makeMessage)
+    store.pushStaged(stagedSpan(messages[1]!.uuid, messages[2]!.uuid))
+
+    expect(
+      scheduler.__testing.overlapsExistingStaged(
+        {
+          startUuid: messages[1]!.uuid,
+          endUuid: messages[2]!.uuid,
+          summary: 'summary',
+          risk: 1,
+        },
+        messages,
+      ),
+    ).toBe(true)
+  })
+
+  test('returns true when the candidate partially overlaps a staged span', () => {
+    const messages = ['1', '2', '3', '4', '5'].map(makeMessage)
+    store.pushStaged(stagedSpan(messages[1]!.uuid, messages[3]!.uuid))
+
+    expect(
+      scheduler.__testing.overlapsExistingStaged(
+        {
+          startUuid: messages[3]!.uuid,
+          endUuid: messages[4]!.uuid,
+          summary: 'summary',
+          risk: 1,
+        },
+        messages,
+      ),
+    ).toBe(true)
+  })
+
+  test('returns false when the candidate does not overlap a staged span', () => {
+    const messages = ['1', '2', '3', '4', '5'].map(makeMessage)
+    store.pushStaged(stagedSpan(messages[0]!.uuid, messages[1]!.uuid))
+
+    expect(
+      scheduler.__testing.overlapsExistingStaged(
+        {
+          startUuid: messages[3]!.uuid,
+          endUuid: messages[4]!.uuid,
+          summary: 'summary',
+          risk: 1,
+        },
+        messages,
+      ),
+    ).toBe(false)
+  })
+})

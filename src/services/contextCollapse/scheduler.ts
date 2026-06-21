@@ -139,9 +139,35 @@ function detectNesting(
 }
 
 function overlapsExistingStaged(
-  _candidate: Candidate,
-  _messages: Message[],
+  candidate: Candidate,
+  messages: Message[],
 ): boolean {
+  const candidateStartIdx = messages.findIndex(
+    message => message.uuid === candidate.startUuid,
+  )
+  const candidateEndIdx = messages.findIndex(
+    message => message.uuid === candidate.endUuid,
+  )
+  if (candidateStartIdx === -1 || candidateEndIdx === -1) return false
+  if (candidateStartIdx > candidateEndIdx) return false
+
+  for (const span of getStaged()) {
+    const stagedStartIdx = messages.findIndex(
+      message => message.uuid === span.startUuid,
+    )
+    const stagedEndIdx = messages.findIndex(
+      message => message.uuid === span.endUuid,
+    )
+    if (stagedStartIdx === -1 || stagedEndIdx === -1) continue
+    if (stagedStartIdx > stagedEndIdx) continue
+    if (
+      candidateStartIdx <= stagedEndIdx &&
+      stagedStartIdx <= candidateEndIdx
+    ) {
+      return true
+    }
+  }
+
   return false
 }
 
