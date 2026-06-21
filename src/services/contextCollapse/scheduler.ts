@@ -98,10 +98,43 @@ function selectStagingCandidate(_view: Message[]): Candidate | undefined {
 }
 
 function detectNesting(
-  _messages: Message[],
-  _startIdx: number,
-  _endIdx: number,
+  messages: Message[],
+  startIdx: number,
+  endIdx: number,
 ): { depth: number; parentId: string | null } {
+  for (const committed of getCommittedLog()) {
+    const committedStartIdx = messages.findIndex(
+      message => message.uuid === committed.entry.firstArchivedUuid,
+    )
+    const committedEndIdx = messages.findIndex(
+      message => message.uuid === committed.entry.lastArchivedUuid,
+    )
+    if (
+      committedStartIdx !== -1 &&
+      committedEndIdx !== -1 &&
+      committedStartIdx <= startIdx &&
+      endIdx <= committedEndIdx
+    ) {
+      return {
+        depth: (committed.entry.depth ?? 0) + 1,
+        parentId: committed.entry.collapseId,
+      }
+    }
+  }
+
+  for (const message of messages.slice(startIdx, endIdx + 1)) {
+    const parentId = getCollapseIdForSummary(message.uuid)
+    if (parentId === undefined) continue
+
+    const parent = getCommittedLog().find(
+      committed => committed.entry.collapseId === parentId,
+    )
+    return {
+      depth: ((parent?.entry.depth ?? 0) as number) + 1,
+      parentId,
+    }
+  }
+
   return { depth: 0, parentId: null }
 }
 

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 import type { UUID } from 'crypto'
+import type { ContextCollapseCommitEntry } from 'src/types/logs.js'
 import type { Message } from 'src/types/message.js'
 
 const recordContextCollapseCommitMock = mock(async () => {})
@@ -49,6 +50,26 @@ function stagedSpan(startUuid: string, endUuid: string): store.StagedSpan {
     summary: 'summary',
     risk: 1,
     stagedAt: 123,
+  }
+}
+
+function commitEntry(
+  collapseId: string,
+  firstArchivedUuid: string,
+  lastArchivedUuid: string,
+  depth = 0,
+): ContextCollapseCommitEntry {
+  return {
+    type: 'marble-origami-commit',
+    sessionId: '00000000-0000-4000-8000-000000000001' as UUID,
+    collapseId,
+    summaryUuid: `00000000-0000-4000-8000-${collapseId.padStart(12, '0')}`,
+    summaryContent: `<collapsed id="${collapseId}">summary</collapsed>`,
+    summary: 'summary',
+    firstArchivedUuid,
+    lastArchivedUuid,
+    depth,
+    parentId: null,
   }
 }
 
@@ -115,6 +136,41 @@ describe('persistSnapshot', () => {
       staged: [span],
       armed: true,
       lastSpawnTokens: 123_456,
+    })
+  })
+})
+
+describe('detectNesting', () => {
+  test('returns depth zero when there is no committed log', () => {
+    const messages = ['1', '2', '3'].map(makeMessage)
+
+    expect(scheduler.__testing.detectNesting(messages, 0, 2)).toEqual({
+      depth: 0,
+      parentId: null,
+    })
+  })
+
+  test('returns one level deeper when the candidate is inside a committed span', () => {
+    const messages = ['1', '2', '3', '4', '5'].map(makeMessage)
+    store.pushCommitted(
+      commitEntry('parent', messages[1]!.uuid, messages[4]!.uuid, 2),
+    )
+
+    expect(scheduler.__testing.detectNesting(messages, 2, 3)).toEqual({
+      depth: 3,
+      parentId: 'parent',
+    })
+  })
+
+  test('returns depth zero when the candidate does not overlap a committed span', () => {
+    const messages = ['1', '2', '3', '4', '5'].map(makeMessage)
+    store.pushCommitted(
+      commitEntry('parent', messages[0]!.uuid, messages[1]!.uuid),
+    )
+
+    expect(scheduler.__testing.detectNesting(messages, 3, 4)).toEqual({
+      depth: 0,
+      parentId: null,
     })
   })
 })
