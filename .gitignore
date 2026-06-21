@@ -47,3 +47,6 @@ ccp-*.tgz
 !.codex/prompts/
 !.codex/prompts/**
 
+
+.hermes/
+Elegant_Engineering/
