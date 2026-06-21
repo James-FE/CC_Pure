@@ -418,3 +418,27 @@ describe('spawnCtxAgent', () => {
     expect(store.getStaged()).toHaveLength(1)
   })
 })
+
+describe('isWithheldPromptTooLong', () => {
+  test('returns false for marble_origami queries', () => {
+    expect(
+      scheduler.isWithheldPromptTooLong(
+        makeMessage('1'),
+        () => true,
+        'marble_origami',
+      ),
+    ).toBe(false)
+  })
+
+  test('returns false when the message is not prompt-too-long', () => {
+    expect(
+      scheduler.isWithheldPromptTooLong(makeMessage('1'), () => false, 'main'),
+    ).toBe(false)
+  })
+
+  test('returns true when a non-marble message is prompt-too-long', () => {
+    expect(
+      scheduler.isWithheldPromptTooLong(makeMessage('1'), () => true, 'main'),
+    ).toBe(true)
+  })
+})

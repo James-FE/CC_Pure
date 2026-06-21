@@ -78,11 +78,13 @@ export function recoverFromOverflow(
 }
 
 export function isWithheldPromptTooLong(
-  _message: Message,
-  _isPromptTooLong: (msg: Message) => boolean,
-  _querySource?: string,
+  message: Message,
+  isPromptTooLong: (msg: Message) => boolean,
+  querySource?: string,
 ): boolean {
-  return false
+  if (querySource === MARBLE_QUERY_SOURCE) return false
+  if (!isPromptTooLong(message)) return false
+  return true
 }
 
 function commitSpans(
