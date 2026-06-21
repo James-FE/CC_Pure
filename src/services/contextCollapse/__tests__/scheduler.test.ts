@@ -5,6 +5,16 @@ import type { Message } from 'src/types/message.js'
 
 const recordContextCollapseCommitMock = mock(async () => {})
 const recordContextCollapseSnapshotMock = mock(async () => {})
+const tokenCountWithEstimationMock = mock((messages: readonly Message[]) =>
+  messages.reduce(
+    (total, message) =>
+      total +
+      (typeof message.tokenEstimate === 'number'
+        ? (message.tokenEstimate as number)
+        : 1),
+    0,
+  ),
+)
 
 mock.module('bun:bundle', () => ({
   feature: () => true,
@@ -24,14 +34,14 @@ mock.module('src/utils/sessionStorage.js', () => ({
 }))
 
 mock.module('src/utils/tokens.js', () => ({
-  tokenCountWithEstimation: (messages: readonly Message[]) => messages.length,
+  tokenCountWithEstimation: tokenCountWithEstimationMock,
 }))
 
 const store = await import('../store.js')
 const registry = await import('../registry.js')
 const scheduler = await import('../scheduler.js')
 
-function makeMessage(label: string): Message {
+function makeMessage(label: string, tokenEstimate?: number): Message {
   return {
     type: 'user',
     uuid: `00000000-0000-4000-8000-${label.padStart(12, '0')}` as UUID,
@@ -40,6 +50,7 @@ function makeMessage(label: string): Message {
       content: label,
     },
     timestamp: `2026-01-01T00:00:${label.padStart(2, '0')}.000Z`,
+    ...(tokenEstimate === undefined ? {} : { tokenEstimate }),
   }
 }
 
@@ -78,6 +89,7 @@ beforeEach(() => {
   registry.clearSummaryRegistry()
   recordContextCollapseCommitMock.mockClear()
   recordContextCollapseSnapshotMock.mockClear()
+  tokenCountWithEstimationMock.mockClear()
 })
 
 describe('maybeWarnEmptySpawn', () => {
@@ -242,5 +254,37 @@ describe('overlapsExistingStaged', () => {
         messages,
       ),
     ).toBe(false)
+  })
+})
+
+describe('selectStagingCandidate', () => {
+  test('returns undefined for an empty view', () => {
+    expect(scheduler.__testing.selectStagingCandidate([])).toBeUndefined()
+  })
+
+  test('returns undefined when every message is in the protected tail', () => {
+    const messages = [
+      makeMessage('1', 10_000),
+      makeMessage('2', 10_000),
+      makeMessage('3', 10_000),
+    ]
+
+    expect(scheduler.__testing.selectStagingCandidate(messages)).toBeUndefined()
+  })
+
+  test('returns a candidate before the protected tail with summary and risk', () => {
+    const messages = [
+      makeMessage('1', 1_500),
+      makeMessage('2', 1_000),
+      makeMessage('3', 20_000),
+      makeMessage('4', 5_000),
+    ]
+
+    expect(scheduler.__testing.selectStagingCandidate(messages)).toEqual({
+      startUuid: messages[0]!.uuid,
+      endUuid: messages[1]!.uuid,
+      summary: 'Collapsed 2 messages.',
+      risk: 2_500,
+    })
   })
 })

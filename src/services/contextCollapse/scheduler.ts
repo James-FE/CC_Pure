@@ -93,8 +93,29 @@ function commitSpans(
   return 0
 }
 
-function selectStagingCandidate(_view: Message[]): Candidate | undefined {
-  return undefined
+function selectStagingCandidate(view: Message[]): Candidate | undefined {
+  if (view.length === 0) return undefined
+
+  let protectedTokens = 0
+  let protectedStartIdx = view.length
+  for (let i = view.length - 1; i >= 0; i--) {
+    protectedTokens += tokenCountWithEstimation([view[i]!])
+    protectedStartIdx = i
+    if (protectedTokens >= PROTECTED_TAIL_TOKENS) break
+  }
+
+  const candidateMessages = view.slice(0, protectedStartIdx)
+  if (candidateMessages.length === 0) return undefined
+
+  const tokens = tokenCountWithEstimation(candidateMessages)
+  if (tokens < MIN_SPAN_TOKENS) return undefined
+
+  return {
+    startUuid: candidateMessages[0]!.uuid,
+    endUuid: candidateMessages[candidateMessages.length - 1]!.uuid,
+    summary: `Collapsed ${candidateMessages.length} messages.`,
+    risk: tokens,
+  }
 }
 
 function detectNesting(
