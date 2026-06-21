@@ -129,7 +129,13 @@ function maybeWarnEmptySpawn(): void {
   }
 }
 
-function persistSnapshot(): void {}
+function persistSnapshot(): void {
+  void recordContextCollapseSnapshot({
+    staged: getStaged().map(span => ({ ...span })),
+    armed: getArmed(),
+    lastSpawnTokens: getLastSpawnTokens(),
+  })
+}
 
 export const __testing = {
   commitSpans,

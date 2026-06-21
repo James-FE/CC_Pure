@@ -99,3 +99,22 @@ describe('maybeWarnEmptySpawn', () => {
     warn.mockRestore()
   })
 })
+
+describe('persistSnapshot', () => {
+  test('records staged spans, armed state, and last spawn tokens', () => {
+    const messages = [makeMessage('1'), makeMessage('2')]
+    const span = stagedSpan(messages[0]!.uuid, messages[1]!.uuid)
+    store.pushStaged(span)
+    store.setArmed(true)
+    store.setLastSpawnTokens(123_456)
+
+    scheduler.__testing.persistSnapshot()
+
+    expect(recordContextCollapseSnapshotMock).toHaveBeenCalledTimes(1)
+    expect(recordContextCollapseSnapshotMock).toHaveBeenCalledWith({
+      staged: [span],
+      armed: true,
+      lastSpawnTokens: 123_456,
+    })
+  })
+})
