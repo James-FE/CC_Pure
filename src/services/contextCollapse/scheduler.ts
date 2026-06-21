@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import type { BetaJSONOutputFormat } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
 import { getSessionId } from 'src/bootstrap/state.js'
 import { getEffectiveContextWindowSize } from 'src/services/compact/autoCompact.js'
 import type {
@@ -10,6 +11,7 @@ import {
   recordContextCollapseCommit,
   recordContextCollapseSnapshot,
 } from 'src/utils/sessionStorage.js'
+import { asSystemPrompt } from 'src/utils/systemPromptType.js'
 import { tokenCountWithEstimation } from 'src/utils/tokens.js'
 import {
   createSummaryMessage,
@@ -46,7 +48,26 @@ const PROTECTED_TAIL_TOKENS = 25_000
 const MIN_SPAN_TOKENS = 2_000
 const EMPTY_SPAWN_WARN_AT = 3
 const MARBLE_QUERY_SOURCE = 'marble_origami'
+const CTX_AGENT_SUMMARY_MAX_TOKENS = 512
+const CTX_AGENT_FALLBACK_RISK = 0.5
 const CTX_AGENT_MESSAGE_CHAR_LIMIT = 500
+const CTX_AGENT_SYSTEM_PROMPT = [
+  'You compress an earlier slice of a coding conversation into a compact summary.',
+  'Preserve decisions, file paths, API shapes, and unresolved TODOs verbatim.',
+  'Also rate how risky the compression is: how likely the summary drops irreplaceable information.',
+]
+const CTX_AGENT_OUTPUT_FORMAT = {
+  type: 'json_schema',
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['summary', 'risk'],
+    properties: {
+      summary: { type: 'string' },
+      risk: { type: 'number', minimum: 0, maximum: 1 },
+    },
+  },
+} satisfies BetaJSONOutputFormat
 
 type ApplyResult = { messages: Message[]; committed: boolean }
 type RecoverResult = { messages: Message[]; committed: number }
@@ -385,10 +406,13 @@ function renderSpanForSummary(span: Message[]): string {
     .join('\n')
 }
 
-function parseVerdict(raw: string): CtxAgentVerdict | undefined {
+function parseVerdict(raw: unknown): CtxAgentVerdict | undefined {
+  const text = typeof raw === 'string' ? raw : extractTextContent(raw)
+  if (text === undefined) return undefined
+
   let parsed: unknown
   try {
-    parsed = JSON.parse(raw)
+    parsed = JSON.parse(text)
   } catch {
     return undefined
   }
@@ -403,6 +427,80 @@ function parseVerdict(raw: string): CtxAgentVerdict | undefined {
   return {
     summary: verdict.summary,
     risk: Math.min(1, Math.max(0, verdict.risk)),
+  }
+}
+
+function extractTextContent(response: unknown): string | undefined {
+  const content = getResponseContent(response)
+  if (typeof content === 'string') return content.trim() || undefined
+  if (!Array.isArray(content)) return undefined
+
+  const text = content
+    .filter((block): block is { text: string } => {
+      if (typeof block !== 'object' || block === null) return false
+      const record = block as Record<string, unknown>
+      return record.type === 'text' && typeof record.text === 'string'
+    })
+    .map(block => block.text)
+    .join('\n')
+    .trim()
+
+  return text || undefined
+}
+
+function getResponseContent(response: unknown): unknown {
+  if (typeof response !== 'object' || response === null) return undefined
+  const record = response as Record<string, unknown>
+  if ('content' in record) return record.content
+
+  const message = record.message
+  if (typeof message !== 'object' || message === null) return undefined
+  return (message as Record<string, unknown>).content
+}
+
+function fallbackVerdict(candidate: Candidate): CtxAgentVerdict {
+  return {
+    summary: candidate.summary,
+    risk: CTX_AGENT_FALLBACK_RISK,
+  }
+}
+
+async function summarizeCandidate(
+  view: Message[],
+  candidate: Candidate,
+  signal: AbortSignal,
+): Promise<CtxAgentVerdict> {
+  const startIdx = view.findIndex(
+    message => message.uuid === candidate.startUuid,
+  )
+  const endIdx = view.findIndex(message => message.uuid === candidate.endUuid)
+  if (startIdx === -1 || endIdx === -1 || startIdx > endIdx) {
+    return fallbackVerdict(candidate)
+  }
+
+  try {
+    /* eslint-disable @typescript-eslint/no-require-imports */
+    const { queryHaiku } =
+      require('src/services/api/claude.js') as typeof import('src/services/api/claude.js')
+    /* eslint-enable @typescript-eslint/no-require-imports */
+    const response = await queryHaiku({
+      systemPrompt: asSystemPrompt(CTX_AGENT_SYSTEM_PROMPT),
+      userPrompt: renderSpanForSummary(view.slice(startIdx, endIdx + 1)),
+      outputFormat: CTX_AGENT_OUTPUT_FORMAT,
+      signal,
+      options: {
+        querySource: MARBLE_QUERY_SOURCE,
+        enablePromptCaching: false,
+        agents: [],
+        isNonInteractiveSession: true,
+        hasAppendSystemPrompt: false,
+        mcpTools: [],
+        maxOutputTokensOverride: CTX_AGENT_SUMMARY_MAX_TOKENS,
+      },
+    })
+    return parseVerdict(response) ?? fallbackVerdict(candidate)
+  } catch {
+    return fallbackVerdict(candidate)
   }
 }
 
@@ -451,6 +549,7 @@ export const __testing = {
   renderSpanForSummary,
   extractAssistantText,
   parseVerdict,
+  summarizeCandidate,
   selectStagingCandidate,
   spawnCtxAgent,
 }

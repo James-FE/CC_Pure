@@ -6,6 +6,11 @@ import type { StagedSpan } from '../store.js'
 
 const recordContextCollapseCommitMock = mock(async () => {})
 const recordContextCollapseSnapshotMock = mock(async () => {})
+const queryHaikuMock = mock(async () =>
+  makeAssistantMessage([
+    { type: 'text', text: '{"summary":"model","risk":0.2}' },
+  ]),
+)
 const tokenCountWithEstimationMock = mock((messages: readonly Message[]) =>
   messages.reduce(
     (total, message) =>
@@ -32,6 +37,10 @@ mock.module('src/services/compact/autoCompact.js', () => ({
 mock.module('src/utils/sessionStorage.js', () => ({
   recordContextCollapseCommit: recordContextCollapseCommitMock,
   recordContextCollapseSnapshot: recordContextCollapseSnapshotMock,
+}))
+
+mock.module('src/services/api/claude.js', () => ({
+  queryHaiku: queryHaikuMock,
 }))
 
 mock.module('src/utils/tokens.js', () => ({
@@ -108,6 +117,12 @@ beforeEach(() => {
   registry.clearSummaryRegistry()
   recordContextCollapseCommitMock.mockClear()
   recordContextCollapseSnapshotMock.mockClear()
+  queryHaikuMock.mockReset()
+  queryHaikuMock.mockImplementation(async () =>
+    makeAssistantMessage([
+      { type: 'text', text: '{"summary":"model","risk":0.2}' },
+    ]),
+  )
   tokenCountWithEstimationMock.mockClear()
 })
 
@@ -178,6 +193,74 @@ describe('parseVerdict', () => {
       summary: 'x',
       risk: 0,
     })
+  })
+})
+
+describe('summarizeCandidate', () => {
+  test('returns the parsed verdict from queryHaiku', async () => {
+    const messages = [
+      makeMessage('1', 1_500),
+      makeMessage('2', 1_000),
+      makeMessage('3', 20_000),
+      makeMessage('4', 5_000),
+    ]
+    const signal = new AbortController().signal
+
+    await expect(
+      scheduler.__testing.summarizeCandidate(
+        messages,
+        {
+          startUuid: messages[0]!.uuid,
+          endUuid: messages[1]!.uuid,
+          summary: 'Collapsed 2 messages.',
+          risk: 2_500,
+        },
+        signal,
+      ),
+    ).resolves.toEqual({ summary: 'model', risk: 0.2 })
+    expect(queryHaikuMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('falls back to the candidate summary when queryHaiku throws', async () => {
+    queryHaikuMock.mockImplementation(async () => {
+      throw new Error('network down')
+    })
+    const messages = [makeMessage('1', 1_500), makeMessage('2', 25_000)]
+    const candidate = {
+      startUuid: messages[0]!.uuid,
+      endUuid: messages[0]!.uuid,
+      summary: 'Collapsed 1 messages.',
+      risk: 1_500,
+    }
+
+    await expect(
+      scheduler.__testing.summarizeCandidate(
+        messages,
+        candidate,
+        new AbortController().signal,
+      ),
+    ).resolves.toEqual({ summary: candidate.summary, risk: 0.5 })
+  })
+
+  test('falls back to the candidate summary when the verdict is invalid', async () => {
+    queryHaikuMock.mockImplementation(async () =>
+      makeAssistantMessage([{ type: 'text', text: 'not json' }]),
+    )
+    const messages = [makeMessage('1', 1_500), makeMessage('2', 25_000)]
+    const candidate = {
+      startUuid: messages[0]!.uuid,
+      endUuid: messages[0]!.uuid,
+      summary: 'Collapsed 1 messages.',
+      risk: 1_500,
+    }
+
+    await expect(
+      scheduler.__testing.summarizeCandidate(
+        messages,
+        candidate,
+        new AbortController().signal,
+      ),
+    ).resolves.toEqual({ summary: candidate.summary, risk: 0.5 })
   })
 })
 
