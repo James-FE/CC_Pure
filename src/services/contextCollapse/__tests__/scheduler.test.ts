@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 import type { UUID } from 'crypto'
 import type { ContextCollapseCommitEntry } from 'src/types/logs.js'
 import type { Message } from 'src/types/message.js'
+import type { StagedSpan } from '../store.js'
 
 const recordContextCollapseCommitMock = mock(async () => {})
 const recordContextCollapseSnapshotMock = mock(async () => {})
@@ -54,7 +55,7 @@ function makeMessage(label: string, tokenEstimate?: number): Message {
   }
 }
 
-function stagedSpan(startUuid: string, endUuid: string): store.StagedSpan {
+function stagedSpan(startUuid: string, endUuid: string): StagedSpan {
   return {
     startUuid,
     endUuid,
