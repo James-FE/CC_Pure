@@ -607,6 +607,32 @@ describe('applySlidingWindow', () => {
     expect(entry.firstArchivedUuid).toBe(old.uuid)
     expect(entry.lastArchivedUuid).toBe(toolResult.uuid)
   })
+
+  test('writes a commit entry with strategy sliding-window and empty summary', () => {
+    const messages = [
+      makeMessage('1', 10_000),
+      makeMessage('2', 10_000),
+      makeMessage('3', 15_000),
+    ]
+
+    expect(scheduler.__testing.applySlidingWindow(messages)).toBe(1)
+
+    const entry = store.getCommittedLog()[0]!.entry
+    expect(entry).toMatchObject({
+      type: 'marble-origami-commit',
+      sessionId: '00000000-0000-4000-8000-000000000001',
+      summaryContent: '',
+      summary: '',
+      firstArchivedUuid: messages[0]!.uuid,
+      lastArchivedUuid: messages[1]!.uuid,
+      depth: 0,
+      parentId: null,
+      tokensIn: 20_000,
+      tokensOut: 0,
+      strategy: 'sliding-window',
+    })
+    expect(recordContextCollapseCommitMock).toHaveBeenCalledWith(entry)
+  })
 })
 
 describe('spawnCtxAgent', () => {
