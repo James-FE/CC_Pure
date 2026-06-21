@@ -568,6 +568,20 @@ describe('applySlidingWindow', () => {
     expect(entry.lastArchivedUuid).toBe(messages[1]!.uuid)
     expect(entry.strategy).toBe('sliding-window')
   })
+
+  test('preserves last user message even if it exceeds target', () => {
+    const old = makeMessage('1', 5_000)
+    const lastUser = makeMessage('2', 20_000)
+    const assistant = makeAssistantMessage([{ type: 'text', text: 'answer' }])
+    assistant.tokenEstimate = 20_000
+    const messages = [old, lastUser, assistant]
+
+    expect(scheduler.__testing.applySlidingWindow(messages)).toBe(1)
+
+    const entry = store.getCommittedLog()[0]!.entry
+    expect(entry.firstArchivedUuid).toBe(old.uuid)
+    expect(entry.lastArchivedUuid).toBe(old.uuid)
+  })
 })
 
 describe('spawnCtxAgent', () => {

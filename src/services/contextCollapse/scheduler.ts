@@ -239,6 +239,13 @@ function applySlidingWindow(messages: Message[]): number {
     if (retainedTokens >= SLIDING_WINDOW_TARGET_TOKENS) break
   }
 
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]!.message?.role === 'user') {
+      if (keepStartIdx > i) keepStartIdx = i
+      break
+    }
+  }
+
   const cutIdx = keepStartIdx - 1
   if (cutIdx < 0) return 0
 
