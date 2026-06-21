@@ -547,6 +547,13 @@ describe('commitSpans', () => {
   })
 })
 
+describe('applySlidingWindow', () => {
+  test('returns 0 for empty messages', () => {
+    expect(scheduler.__testing.applySlidingWindow([])).toBe(0)
+    expect(store.getCommittedLog()).toEqual([])
+  })
+})
+
 describe('spawnCtxAgent', () => {
   function makeSpawnMessages(): Message[] {
     return [

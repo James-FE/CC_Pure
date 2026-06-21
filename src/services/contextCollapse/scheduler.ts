@@ -45,6 +45,7 @@ const COMMIT_START_FRAC = 0.9
 const BLOCKING_FRAC = 0.95
 const SPAWN_INTERVAL_TOKENS = 12_000
 const PROTECTED_TAIL_TOKENS = 25_000
+const SLIDING_WINDOW_TARGET_TOKENS = 15_000
 const MIN_SPAN_TOKENS = 2_000
 const EMPTY_SPAWN_WARN_AT = 3
 const MARBLE_QUERY_SOURCE = 'marble_origami'
@@ -224,6 +225,12 @@ function commitSpans(
   }
 
   return committed
+}
+
+function applySlidingWindow(messages: Message[]): number {
+  if (messages.length === 0) return 0
+
+  return 0
 }
 
 function collapseEntryFromCommit(
@@ -557,6 +564,7 @@ function persistSnapshot(): void {
 }
 
 export const __testing = {
+  applySlidingWindow,
   commitSpans,
   detectNesting,
   maybeWarnEmptySpawn,
