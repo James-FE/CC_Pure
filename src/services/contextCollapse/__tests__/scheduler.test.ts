@@ -442,3 +442,64 @@ describe('isWithheldPromptTooLong', () => {
     ).toBe(true)
   })
 })
+
+describe('recoverFromOverflow', () => {
+  test('short-circuits marble_origami queries', () => {
+    const messages = [makeMessage('1')]
+
+    expect(scheduler.recoverFromOverflow(messages, 'marble_origami')).toEqual({
+      messages,
+      committed: 0,
+    })
+  })
+
+  test('returns zero when there are no staged spans and no candidate', () => {
+    const messages: Message[] = []
+
+    expect(scheduler.recoverFromOverflow(messages, 'main')).toEqual({
+      messages,
+      committed: 0,
+    })
+  })
+
+  test('commits staged spans and returns a projected view', () => {
+    const messages = [
+      makeMessage('1', 1_000),
+      makeMessage('2', 1_000),
+      makeMessage('3', 1_000),
+    ]
+    store.pushStaged(stagedSpan(messages[0]!.uuid, messages[1]!.uuid))
+
+    const result = scheduler.recoverFromOverflow(messages, 'main')
+
+    expect(result.committed).toBe(1)
+    expect(result.messages).toHaveLength(2)
+    expect(result.messages[0]!.message?.content).toBe(
+      '<collapsed id="0000000000000001">summary</collapsed>',
+    )
+    expect(result.messages[1]).toBe(messages[2])
+    expect(store.getStaged()).toEqual([])
+  })
+
+  test('commits a truncate candidate when staged spans are empty', () => {
+    const messages = [
+      makeMessage('1', 1_500),
+      makeMessage('2', 1_000),
+      makeMessage('3', 20_000),
+      makeMessage('4', 5_000),
+    ]
+
+    const result = scheduler.recoverFromOverflow(messages, 'main')
+
+    expect(result.committed).toBe(1)
+    expect(store.getCommittedLog()[0]!.entry.strategy).toBe('truncate')
+    expect(result.messages).toHaveLength(3)
+  })
+
+  test('returns synchronously without a Promise', () => {
+    const result = scheduler.recoverFromOverflow([], 'main')
+
+    expect(result).not.toBeInstanceOf(Promise)
+    expect(result).toEqual({ messages: [], committed: 0 })
+  })
+})

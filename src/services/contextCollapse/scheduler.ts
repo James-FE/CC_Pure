@@ -72,9 +72,26 @@ export async function applyCollapsesIfNeeded(
 
 export function recoverFromOverflow(
   messages: Message[],
-  _querySource?: string,
+  querySource?: string,
 ): RecoverResult {
-  return { messages, committed: 0 }
+  if (querySource === MARBLE_QUERY_SOURCE) return { messages, committed: 0 }
+
+  let committed = commitSpans(messages, drainStaged(), 'llm-summary')
+  if (committed === 0) {
+    const candidate = selectStagingCandidate(projectCommittedView(messages))
+    if (candidate) {
+      committed = commitSpans(
+        messages,
+        [{ ...candidate, stagedAt: Date.now() }],
+        'truncate',
+      )
+    }
+  }
+
+  if (committed === 0) return { messages, committed: 0 }
+
+  persistSnapshot()
+  return { messages: projectCommittedView(messages), committed }
 }
 
 export function isWithheldPromptTooLong(
@@ -178,6 +195,30 @@ function collapseEntryFromCommit(
       strategy: entry.strategy ?? 'llm-summary',
     },
   }
+}
+
+function projectCommittedView(messages: Message[]): Message[] {
+  const collapseLog = getCommittedLog()
+    .map(committed => {
+      const startIdx = messages.findIndex(
+        message => message.uuid === committed.entry.firstArchivedUuid,
+      )
+      const endIdx = messages.findIndex(
+        message => message.uuid === committed.entry.lastArchivedUuid,
+      )
+      if (startIdx === -1 || endIdx === -1 || startIdx > endIdx) {
+        return undefined
+      }
+      return collapseEntryFromCommit(
+        messages,
+        committed.entry,
+        startIdx,
+        endIdx,
+      )
+    })
+    .filter(entry => entry !== undefined)
+
+  return projectView(messages, collapseLog)
 }
 
 function selectStagingCandidate(view: Message[]): Candidate | undefined {
