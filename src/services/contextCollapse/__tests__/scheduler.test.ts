@@ -55,6 +55,24 @@ function makeMessage(label: string, tokenEstimate?: number): Message {
   }
 }
 
+function makeAssistantMessage(content: unknown): Message {
+  return {
+    type: 'assistant',
+    uuid: '00000000-0000-4000-8000-000000000999' as UUID,
+    message: {
+      id: 'msg_000000000999',
+      type: 'message',
+      role: 'assistant',
+      model: 'claude-haiku',
+      content: content as never,
+      stop_reason: 'end_turn',
+      stop_sequence: null,
+      usage: { input_tokens: 1, output_tokens: 1 },
+    },
+    timestamp: '2026-01-01T00:00:59.000Z',
+  }
+}
+
 function stagedSpan(startUuid: string, endUuid: string): StagedSpan {
   return {
     startUuid,
@@ -91,6 +109,41 @@ beforeEach(() => {
   recordContextCollapseCommitMock.mockClear()
   recordContextCollapseSnapshotMock.mockClear()
   tokenCountWithEstimationMock.mockClear()
+})
+
+describe('renderSpanForSummary', () => {
+  test('formats a normal message as role-prefixed text', () => {
+    expect(
+      scheduler.__testing.renderSpanForSummary([makeMessage('hello')]),
+    ).toBe('[user] hello')
+  })
+
+  test('returns an empty string for an empty span', () => {
+    expect(scheduler.__testing.renderSpanForSummary([])).toBe('')
+  })
+
+  test('serializes assistant tool_use blocks as JSON text', () => {
+    const message = makeAssistantMessage([
+      {
+        type: 'tool_use',
+        id: 'toolu_1',
+        name: 'Read',
+        input: { file_path: 'src/index.ts' },
+      },
+    ])
+
+    expect(scheduler.__testing.extractAssistantText(message)).toBe(
+      JSON.stringify(message.message.content),
+    )
+  })
+
+  test('truncates each rendered message to 500 characters', () => {
+    const long = 'x'.repeat(501)
+
+    expect(scheduler.__testing.renderSpanForSummary([makeMessage(long)])).toBe(
+      `[user] ${'x'.repeat(500)}`,
+    )
+  })
 })
 
 describe('maybeWarnEmptySpawn', () => {

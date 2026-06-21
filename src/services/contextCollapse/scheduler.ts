@@ -46,6 +46,7 @@ const PROTECTED_TAIL_TOKENS = 25_000
 const MIN_SPAN_TOKENS = 2_000
 const EMPTY_SPAWN_WARN_AT = 3
 const MARBLE_QUERY_SOURCE = 'marble_origami'
+const CTX_AGENT_MESSAGE_CHAR_LIMIT = 500
 
 type ApplyResult = { messages: Message[]; committed: boolean }
 type RecoverResult = { messages: Message[]; committed: number }
@@ -360,6 +361,26 @@ function overlapsExistingStaged(
   return false
 }
 
+function extractAssistantText(message: Message): string {
+  const content = message.message?.content
+  if (typeof content === 'string') return content
+  if (content === undefined) return ''
+  return JSON.stringify(content)
+}
+
+function renderSpanForSummary(span: Message[]): string {
+  return span
+    .map(message => {
+      const role = message.message?.role ?? message.type
+      const content = extractAssistantText(message).slice(
+        0,
+        CTX_AGENT_MESSAGE_CHAR_LIMIT,
+      )
+      return `[${role}] ${content}`
+    })
+    .join('\n')
+}
+
 async function spawnCtxAgent(
   view: Message[],
   _ctx: CollapseContext,
@@ -402,6 +423,8 @@ export const __testing = {
   maybeWarnEmptySpawn,
   overlapsExistingStaged,
   persistSnapshot,
+  renderSpanForSummary,
+  extractAssistantText,
   selectStagingCandidate,
   spawnCtxAgent,
 }
