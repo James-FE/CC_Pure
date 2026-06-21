@@ -236,6 +236,9 @@ export type SpeculationAcceptMessage = {
   timeSavedMs: number
 }
 
+/** Strategy used to collapse a message span. */
+export type CollapseStrategy = 'llm-summary' | 'truncate' | 'sliding-window'
+
 /**
  * Persisted context-collapse commit. The archived messages themselves are
  * NOT persisted — they're already in the transcript as ordinary user/
@@ -266,6 +269,16 @@ export type ContextCollapseCommitEntry = {
   /** Span boundaries — projectView finds these in the resumed Message[]. */
   firstArchivedUuid: string
   lastArchivedUuid: string
+  /** 折叠嵌套深度；0 表示顶层折叠。 */
+  depth?: number
+  /** 父级折叠 ID；顶层折叠为 null。 */
+  parentId?: string | null
+  /** 折叠前输入 token 数。 */
+  tokensIn?: number
+  /** 折叠后摘要 token 数。 */
+  tokensOut?: number
+  /** 本次消息跨度折叠使用的策略。 */
+  strategy?: CollapseStrategy
 }
 
 /**

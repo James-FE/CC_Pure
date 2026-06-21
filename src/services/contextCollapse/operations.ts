@@ -1,12 +1,10 @@
 import { randomUUID, type UUID } from 'crypto'
+import type { CollapseStrategy } from 'src/types/logs.js'
 import type { ContextCollapseCommitEntry } from 'src/types/logs.js'
 import type { Message } from 'src/types/message.js'
 import { getRestoredCommits } from './persist.js'
 
-/**
- * Strategy used to collapse a message span.
- */
-export type CollapseStrategy = 'llm-summary' | 'truncate' | 'sliding-window'
+export type { CollapseStrategy }
 
 /**
  * Records a single context collapse operation — a span of messages
@@ -142,7 +140,7 @@ function commitToSpan(
     },
     replacement: {
       text: commit.summary,
-      tokens: 0,
+      tokens: commit.tokensOut ?? 0,
     },
     createdAt:
       typeof endTimestamp === 'string'
@@ -150,13 +148,13 @@ function commitToSpan(
         : typeof startTimestamp === 'string'
           ? startTimestamp
           : new Date(0).toISOString(),
-    depth: 0,
-    parentId: null,
+    depth: commit.depth ?? 0,
+    parentId: commit.parentId ?? null,
     meta: {
       messageCount: endIdx - startIdx + 1,
-      tokensIn: 0,
-      tokensOut: 0,
-      strategy: 'llm-summary',
+      tokensIn: commit.tokensIn ?? 0,
+      tokensOut: commit.tokensOut ?? 0,
+      strategy: commit.strategy ?? 'llm-summary',
     },
   }
 }

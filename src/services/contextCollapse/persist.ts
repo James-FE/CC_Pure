@@ -37,7 +37,14 @@ function isValidCommitEntry(
     typeof entry.summaryContent === 'string' &&
     typeof entry.summary === 'string' &&
     typeof entry.firstArchivedUuid === 'string' &&
-    typeof entry.lastArchivedUuid === 'string'
+    typeof entry.lastArchivedUuid === 'string' &&
+    (entry.depth === undefined || typeof entry.depth === 'number') &&
+    (entry.parentId === undefined ||
+      entry.parentId === null ||
+      typeof entry.parentId === 'string') &&
+    (entry.tokensIn === undefined || typeof entry.tokensIn === 'number') &&
+    (entry.tokensOut === undefined || typeof entry.tokensOut === 'number') &&
+    (entry.strategy === undefined || typeof entry.strategy === 'string')
   )
 }
 
