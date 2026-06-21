@@ -1,3 +1,5 @@
+import type { Message } from 'src/types/message.js'
+
 interface CollapseStats {
   totalMessages: number
   collapsedMessages: number
@@ -23,18 +25,26 @@ function notifySubscribers(): void {
 }
 
 export function getStats(): CollapseStats {
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const { getCommittedLog, getHealth, getStaged } =
+    require('./store.js') as typeof import('./store.js')
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  const committed = getCommittedLog()
+  const health = getHealth()
+  const collapsedMessages = committed.reduce((n, c) => n + c.archived.length, 0)
   return {
     totalMessages: 0,
-    collapsedMessages: 0,
-    emptySpawnWarningEmitted: false,
+    collapsedMessages,
+    emptySpawnWarningEmitted: health.emptySpawnWarningEmitted,
     health: {
-      totalSpawns: 0,
-      totalErrors: 0,
-      emptySpawnWarningEmitted: false,
-      totalEmptySpawns: 0,
+      totalSpawns: health.totalSpawns,
+      totalErrors: health.totalErrors,
+      lastError: health.lastError,
+      emptySpawnWarningEmitted: health.emptySpawnWarningEmitted,
+      totalEmptySpawns: health.totalEmptySpawns,
     },
-    collapsedSpans: 0,
-    stagedSpans: 0,
+    collapsedSpans: committed.length,
+    stagedSpans: getStaged().length,
   }
 }
 
@@ -58,26 +68,51 @@ export function initContextCollapse(): void {
 export function resetContextCollapse(): void {
   if (!contextCollapseEnabled) return
   contextCollapseEnabled = false
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const { reset: resetStore } =
+    require('./store.js') as typeof import('./store.js')
+  const { clearSummaryRegistry } =
+    require('./registry.js') as typeof import('./registry.js')
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  resetStore()
+  clearSummaryRegistry()
   notifySubscribers()
 }
 
-/** @stub */
-export function applyCollapsesIfNeeded(..._args: unknown[]): {
-  messages: unknown[]
-  committed: boolean
-} {
-  return { messages: (_args[0] as unknown[]) || [], committed: false }
+/** @stub → scheduler.ts */
+export async function applyCollapsesIfNeeded(
+  messages: Message[],
+  ctx: unknown,
+  querySource?: string,
+): Promise<{ messages: Message[]; committed: boolean }> {
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const s = require('./scheduler.js') as typeof import('./scheduler.js')
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  return s.applyCollapsesIfNeeded(messages, ctx, querySource)
 }
 
-/** @stub */
-export function isWithheldPromptTooLong(..._args: unknown[]): boolean {
-  return false
+/** @stub → scheduler.ts */
+export function isWithheldPromptTooLong(
+  message: Message,
+  isPromptTooLong: (msg: Message) => boolean,
+  querySource?: string,
+): boolean {
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const s = require('./scheduler.js') as typeof import('./scheduler.js')
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  return s.isWithheldPromptTooLong(message, isPromptTooLong, querySource)
 }
 
-/** @stub */
-export function recoverFromOverflow(..._args: unknown[]): {
-  messages: unknown[]
-  committed: boolean
+/** @stub → scheduler.ts */
+export function recoverFromOverflow(
+  messages: Message[],
+  querySource?: string,
+): {
+  messages: Message[]
+  committed: number
 } {
-  return { messages: (_args[0] as unknown[]) || [], committed: false }
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const s = require('./scheduler.js') as typeof import('./scheduler.js')
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  return s.recoverFromOverflow(messages, querySource)
 }

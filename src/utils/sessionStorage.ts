@@ -1,6 +1,7 @@
 import { feature } from 'bun:bundle'
 import type { UUID } from 'crypto'
 import type { Dirent } from 'fs'
+import type { CollapseStrategy } from 'src/types/logs.js'
 // Sync fs primitives for readFileTailSync — separate from fs/promises
 // imports above. Named (not wildcard) per CLAUDE.md style; no collisions
 // with the async-suffixed names.
@@ -1568,6 +1569,11 @@ export async function recordContextCollapseCommit(commit: {
   summary: string
   firstArchivedUuid: string
   lastArchivedUuid: string
+  depth?: number
+  parentId?: string | null
+  tokensIn?: number
+  tokensOut?: number
+  strategy?: CollapseStrategy
 }): Promise<void> {
   const sessionId = getSessionId() as UUID
   if (!sessionId) return

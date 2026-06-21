@@ -61,7 +61,7 @@ export const DEFAULT_BUILD_FEATURES = [
   'ACP', // ACP 代理协议，支持外部 agent 接入
   'WORKFLOW_SCRIPTS', // Re-enabled: require() migration + no-split build support
   'HISTORY_SNIP', // 历史消息裁剪，压缩上下文窗口
-  // 'CONTEXT_COLLAPSE', // 已禁用：实现是空壳 stub，启用后会抑制 auto compact 导致上下文管理完全失效
+  'CONTEXT_COLLAPSE', // 上下文折叠（scheduler + ctx-agent + queryHaiku），replace autoCompact
   'MONITOR_TOOL', // 已修复：require() 迁移后 splitting:true 不再触发 __esm() 死锁
   'FORK_SUBAGENT', // Fork subagent command and implicit fork Agent path
   'KAIROS', // Kairos 定时任务系统核心
