@@ -159,6 +159,17 @@ export function recoverFromOverflow(
     }
   }
 
+  if (committed === 0) {
+    const windowCommitted = applySlidingWindow(messages)
+    if (windowCommitted > 0) {
+      persistSnapshot()
+      return {
+        messages: projectCommittedView(messages),
+        committed: windowCommitted,
+      }
+    }
+  }
+
   if (committed === 0) return { messages, committed: 0 }
 
   persistSnapshot()

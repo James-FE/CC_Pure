@@ -799,6 +799,19 @@ describe('recoverFromOverflow', () => {
     expect(result.messages).toHaveLength(3)
   })
 
+  test('falls through to sliding-window when truncate returns zero', () => {
+    const messages = [
+      makeMessage('1', 4_000),
+      makeMessage('2', 10_000),
+      makeMessage('3', 6_000),
+    ]
+
+    const result = scheduler.recoverFromOverflow(messages, 'main')
+
+    expect(result.committed).toBe(1)
+    expect(store.getCommittedLog()[0]!.entry.strategy).toBe('sliding-window')
+  })
+
   test('returns synchronously without a Promise', () => {
     const result = scheduler.recoverFromOverflow([], 'main')
 
