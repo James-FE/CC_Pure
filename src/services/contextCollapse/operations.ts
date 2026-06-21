@@ -206,6 +206,7 @@ export function projectView(
   const insertions = new Map<number, Message>() // idx → summary message
 
   for (const entry of sorted) {
+    if (entry.meta.strategy === 'sliding-window') continue
     insertions.set(entry.span.startIdx, createSummaryMessage(entry))
   }
 

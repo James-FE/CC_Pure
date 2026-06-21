@@ -26,6 +26,7 @@ function makeEntry(
   startIdx: number,
   endIdx: number,
   summary: string,
+  strategy: CollapseEntry['meta']['strategy'] = 'llm-summary',
 ): CollapseEntry {
   return {
     id,
@@ -45,7 +46,7 @@ function makeEntry(
       messageCount: endIdx - startIdx + 1,
       tokensIn: 100,
       tokensOut: 8,
-      strategy: 'llm-summary',
+      strategy,
     },
   }
 }
@@ -128,6 +129,16 @@ describe('projectView', () => {
       '<collapsed id="collapse">restored summary</collapsed>',
     )
     expect(projected[2]).toBe(messages[3])
+  })
+
+  test('returns messages without a placeholder for sliding-window entries', () => {
+    const messages = ['m0', 'm1', 'm2'].map(makeMessage)
+
+    const projected = projectView(messages, [
+      makeEntry('sliding', 0, 0, '', 'sliding-window'),
+    ])
+
+    expect(projected).toEqual([messages[1], messages[2]])
   })
 })
 
