@@ -6,14 +6,14 @@
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-black?style=flat-square&logo=bun)](https://bun.sh/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)]()
-[![Tests](https://img.shields.io/badge/tests-3986-brightgreen?style=flat-square)]()
+[![Tests](https://img.shields.io/badge/tests-4090-brightgreen?style=flat-square)]()
 [![CodeQL](https://img.shields.io/badge/CodeQL-0%20open%20%C2%B7%2047%20risk%20accepted-yellow?style=flat-square)]()
 [![TypeScript](https://img.shields.io/badge/tsc-0%20errors-brightgreen?style=flat-square)]()
 [![下载](https://img.shields.io/badge/下载-最新版-blue?style=flat-square)](https://github.com/James-FE/CC_Pure/releases/latest)
 
 > Claude Code 学习版 —— 个人维护，去遥测、保留核心能力。仅供学习研究。
 >
-> **当前版本（2026-06）：** 人格系统 · Coordinator SQLite 黑板 · 类型完工 · CodeQL 归零
+> **当前版本（2026-06）：** 人格系统 · 上下文折叠 (v2.8.0) · Coordinator SQLite 黑板 · 类型完工 · CodeQL 归零
 
 ---
 
@@ -87,6 +87,7 @@ CC Pure 基于 CCB v2.6.11 反编译源码，做了以下核心变更：
 | v2.6.11 | 2026-06-06 | 6 commits | **版本同步**：Vite 构建优化 (RSS 966MB→35MB)、ACP subagent 层级透传 |
 | type-wrought | 2026-06-08 | — | **🔧 类型系统完工**：Zod v4 + MCP SDK 类型裂缝修复，`tsc` **0 错误** |
 | scars-mapped | 2026-06-09 | — | **🛡️ CodeQL 审计完工**：升级 security-and-quality，0 open |
+| v2.8.0 | 2026-06-21 | — | **🧠 上下文折叠**：三层 Compaction 管线，3001 行 / 151 测试 |
 
 > **累计**：187 候选 commit 审查 → ✅ 59 MERGE / 🟡 34 已有 / ❌ 94 SKIP。详见 [`docs/upstream-sync.md`](docs/upstream-sync.md)
 
@@ -155,6 +156,7 @@ CLAUDE_CODE_USE_OPENAI=1 bun run dev -- --coordinator
 | **自主代理** | PROACTIVE + DAEMON + COORDINATOR_MODE | ✅ |
 | **记忆系统** | EXTRACT_MEMORIES + LODESTONE + AWAY_SUMMARY | ✅ |
 | **推理增强** | ULTRATHINK + ULTRAPLAN + VERIFICATION_AGENT | ✅ |
+| **上下文** | CONTEXT_COLLAPSE（三层降级，v2.8.0）+ HISTORY_SNIP | ✅ |
 
 ### 🎭 人格模式系统（soul-distilled）
 
@@ -182,12 +184,35 @@ CLAUDE_CODE_USE_OPENAI=1 bun run dev -- --coordinator
 
 ---
 
+### 🧠 上下文管理 — 三层 Compaction 管线
+
+```
+messagesForQuery
+  → ① HISTORY_SNIP      [手术刀]  精准删除历史消息
+  → ② CONTEXT_COLLAPSE  [调度脑]  智能折叠（替代 autoCompact）
+  → ③ autocompact       [断头台]  兜底传统压缩
+```
+
+**流程：** 每次 API 调用前，scheduler 检查 token 用量——90% 标记候选区间，95% 触发压缩。首选 DeepSeek v4 Flash 生成智能摘要（99%+ 压缩率，零幻觉），模型不可用则纯截断，都失败则滑窗切尾逃生。
+
+**状态机三拍：** staged → spawn → commit（入队候选 → 调模型出摘要 + 风险分 → 替换原文）。
+
+| 组件 | 定位 | 状态 |
+|------|------|:--:|
+| HISTORY_SNIP | LLM 摘要 + exchange-aware 分组，不产生孤立 tool pair | ✅ v2.6.11 |
+| CONTEXT_COLLAPSE | 3001 行 / 151 测试，scheduler + ctx-agent + queryHaiku | ✅ v2.8.0 |
+| 三层降级链 | 模型摘要 → 纯截断 → 滑窗切尾 | ✅ |
+
+→ 设计文档：[`CONTEXT_COLLAPSE-design.md`](docs/CONTEXT_COLLAPSE-design.md)
+
+---
+
 ## 工程质量
 
 | 指标 | CCB 基线 | CC Pure 当前 | 提升 |
 |------|:--------:|:----------:|:----:|
 | tsc 错误 | 62 | **0** | 反编译残留全清零 |
-| 测试通过 | 3007 | **3986** | +979 |
+| 测试通过 | 3007 | **4090** | +1083 |
 | 构建 | 不稳定 | **稳定（splitting）** | ✅ |
 | 遥测外连 | 有 | **0** | ✅ |
 | CodeQL open | 175+ | **0** | 254 fixed · 260 dismissed |

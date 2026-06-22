@@ -6,14 +6,14 @@
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-black?style=flat-square&logo=bun)](https://bun.sh/)
 [![Build](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)]()
-[![Tests](https://img.shields.io/badge/tests-3986-brightgreen?style=flat-square)]()
+[![Tests](https://img.shields.io/badge/tests-4090-brightgreen?style=flat-square)]()
 [![CodeQL](https://img.shields.io/badge/CodeQL-0%20open%20%C2%B7%2047%20risk%20accepted-yellow?style=flat-square)]()
 [![TypeScript](https://img.shields.io/badge/tsc-0%20errors-brightgreen?style=flat-square)]()
 [![Download](https://img.shields.io/badge/download-latest-blue?style=flat-square)](https://github.com/James-FE/CC_Pure/releases/latest)
 
 > A clean, independently-maintained study edition. **Telemetry removed. Types fixed. Core capabilities preserved.**
 >
-> **Current (2026-06):** Personality system · Coordinator SQLite blackboard · 0 tsc errors · 0 CodeQL
+> **Current (2026-06):** Personality system · Context collapse (v2.8.0) · Coordinator SQLite blackboard · 0 tsc errors · 0 CodeQL
 
 ---
 
@@ -85,6 +85,7 @@ CC Pure is based on decompiled CCB v2.6.11 sources with these key changes:
 | | BG_SESSIONS (ps/logs/attach/kill) | ✅ |
 | **Memory** | EXTRACT_MEMORIES + LODESTONE + AWAY_SUMMARY | ✅ |
 | **Reasoning** | ULTRATHINK + ULTRAPLAN + VERIFICATION_AGENT | ✅ |
+| **Context** | CONTEXT_COLLAPSE (3-tier, v2.8.0) + HISTORY_SNIP | ✅ |
 | **Tools** | TOKEN_BUDGET + PROMPT_CACHE_BREAK_DETECTION | ✅ |
 | **IPC** | UDS_INBOX + LAN_PIPES (process pipes) | ✅ enabled |
 | **Voice** | VOICE_MODE | 🟡 Code complete, needs Anthropic OAuth |
@@ -164,12 +165,35 @@ CLAUDE_CODE_USE_OPENAI=1 bun run dev -- --coordinator
 
 ---
 
+### 🧠 Context Management — 3-Tier Compaction Pipeline
+
+```
+messagesForQuery
+  → ① HISTORY_SNIP      [Scalpel]  Precise message deletion
+  → ② CONTEXT_COLLAPSE  [Brain]    Intelligent collapse (replaces autoCompact)
+  → ③ autocompact       [Guillotine]  Fallback traditional compression
+```
+
+**Flow:** Before each API call, the scheduler checks token usage — 90% marks a candidate span, 95% triggers compaction. DeepSeek v4 Flash generates a smart summary (99%+ compression rate, zero hallucination); falls back to truncation if the model is unavailable; sliding-window tail cut as last resort.
+
+**State machine:** staged → spawn → commit (enqueue candidate → call model for summary + risk score → replace original messages).
+
+| Component | Role | Status |
+|-----------|------|:------:|
+| HISTORY_SNIP | LLM summaries + exchange-aware grouping, no orphan tool pairs | ✅ v2.6.11 |
+| CONTEXT_COLLAPSE | 3,001 lines / 151 tests, scheduler + ctx-agent + queryHaiku | ✅ v2.8.0 |
+| Degradation chain | Model summary → truncation → sliding window | ✅ |
+
+→ Design doc: [`CONTEXT_COLLAPSE-design.md`](docs/CONTEXT_COLLAPSE-design.md)
+
+---
+
 ## Engineering Quality
 
 | Metric | CCB Baseline | CC Pure | Improvement |
 |--------|:------------:|:-------:|:-----------:|
 | tsc errors | 62 | **0** | All decompilation artifacts cleared |
-| Tests passing | 3,007 | **3,986** | +979 |
+| Tests passing | 3,007 | **4,090** | +1,083 |
 | Build | Unstable | **Stable (splitting: true)** | ✅ |
 | Telemetry egress | Yes | **0** | ✅ |
 | CodeQL open | 175+ | **0** | 254 fixed · 260 dismissed |
