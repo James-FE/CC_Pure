@@ -1689,6 +1689,11 @@ async function* queryModel(
           type: 'enabled',
         } satisfies BetaMessageStreamParams['thinking']
       }
+    } else if (!hasThinking) {
+      // Non-Anthropic providers (e.g. MiMo) default to thinking ON
+      // when the parameter is absent. Explicitly disable so the
+      // clear user intent (thinking disabled) is always honoured.
+      thinking = { type: 'disabled' }
     }
 
     // Get API context management strategies if enabled

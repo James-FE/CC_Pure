@@ -69,7 +69,11 @@ import {
   getTokenCountFromUsage,
 } from '../../utils/tokens.js'
 import { createAbortController } from '../abortController.js'
-import { type AgentContext, runWithAgentContext } from '../agentContext.js'
+import {
+  type AgentContext,
+  type TeammateAgentContext,
+  runWithAgentContext,
+} from '../agentContext.js'
 import { count } from '../array.js'
 import { logForDebugging } from '../debug.js'
 import { cloneFileStateCache } from '../fileStateCache.js'
@@ -116,6 +120,40 @@ import { TEAMMATE_SYSTEM_PROMPT_ADDENDUM } from './teammatePromptAddendum.js'
 type SetAppStateFn = (updater: (prev: AppState) => AppState) => void
 
 const PERMISSION_POLL_INTERVAL_MS = 500
+
+export function isInProcessTeamLead(
+  identity: Pick<TeammateIdentity, 'agentName'>,
+): boolean {
+  return identity.agentName === TEAM_LEAD_NAME
+}
+
+export function createInProcessAgentContext(
+  identity: TeammateIdentity,
+  invokingRequestId?: string,
+): TeammateAgentContext {
+  return {
+    agentId: identity.agentId,
+    parentSessionId: identity.parentSessionId,
+    agentName: identity.agentName,
+    teamName: identity.teamName,
+    agentColor: identity.color,
+    planModeRequired: identity.planModeRequired,
+    isTeamLead: isInProcessTeamLead(identity),
+    agentType: 'teammate',
+    invokingRequestId,
+    invocationKind: 'spawn',
+    invocationEmitted: false,
+  }
+}
+
+export function buildInProcessTeammateSystemPromptParts(
+  fullSystemPromptParts: string[],
+  isTeamLead: boolean,
+): string[] {
+  return isTeamLead
+    ? [...fullSystemPromptParts]
+    : [...fullSystemPromptParts, TEAMMATE_SYSTEM_PROMPT_ADDENDUM]
+}
 
 /**
  * Creates a canUseTool function for in-process teammates that properly resolves
@@ -920,19 +958,7 @@ export async function runInProcessTeammate(
   )
 
   // Create AgentContext for analytics attribution
-  const agentContext: AgentContext = {
-    agentId: identity.agentId,
-    parentSessionId: identity.parentSessionId,
-    agentName: identity.agentName,
-    teamName: identity.teamName,
-    agentColor: identity.color,
-    planModeRequired: identity.planModeRequired,
-    isTeamLead: false,
-    agentType: 'teammate',
-    invokingRequestId,
-    invocationKind: 'spawn',
-    invocationEmitted: false,
-  }
+  const agentContext = createInProcessAgentContext(identity, invokingRequestId)
 
   // Build system prompt based on systemPromptMode
   let teammateSystemPrompt: string
@@ -946,10 +972,10 @@ export async function runInProcessTeammate(
       toolUseContext.options.mcpClients,
     )
 
-    const systemPromptParts = [
-      ...fullSystemPromptParts,
-      TEAMMATE_SYSTEM_PROMPT_ADDENDUM,
-    ]
+    const systemPromptParts = buildInProcessTeammateSystemPromptParts(
+      fullSystemPromptParts,
+      agentContext.isTeamLead,
+    )
 
     // If custom agent definition provided, append its prompt
     if (agentDefinition) {

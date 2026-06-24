@@ -104,6 +104,7 @@ import { getSessionIngressAuthToken } from './utils/sessionIngressAuth.js';
 import { settingsChangeDetector } from './utils/settings/changeDetector.js';
 import { skillChangeDetector } from './utils/skills/skillChangeDetector.js';
 import { jsonParse, writeFileSync_DEPRECATED } from './utils/slowOperations.js';
+import { TEAM_LEAD_NAME } from './utils/swarm/constants.js';
 import { computeInitialTeamContext } from './utils/swarm/reconnection.js';
 import { initializeWarningHandler } from './utils/warningHandler.js';
 import { isWorktreeModeEnabled } from './utils/worktreeModeEnabled.js';
@@ -1785,7 +1786,8 @@ async function run(): Promise<CommanderCommand> {
         isAgentSwarmsEnabled() &&
         storedTeammateOpts?.agentId &&
         storedTeammateOpts?.agentName &&
-        storedTeammateOpts?.teamName
+        storedTeammateOpts?.teamName &&
+        storedTeammateOpts.agentName !== TEAM_LEAD_NAME
       ) {
         const addendum = getTeammatePromptAddendum().TEAMMATE_SYSTEM_PROMPT_ADDENDUM;
         appendSystemPrompt = appendSystemPrompt ? `${appendSystemPrompt}\n\n${addendum}` : addendum;
