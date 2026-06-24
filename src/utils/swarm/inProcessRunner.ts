@@ -115,7 +115,10 @@ import {
   createPermissionRequest,
   sendPermissionRequestViaMailbox,
 } from './permissionSync.js'
-import { TEAMMATE_SYSTEM_PROMPT_ADDENDUM } from './teammatePromptAddendum.js'
+import {
+  TEAM_LEAD_SYSTEM_PROMPT_ADDENDUM,
+  TEAMMATE_SYSTEM_PROMPT_ADDENDUM,
+} from './teammatePromptAddendum.js'
 
 type SetAppStateFn = (updater: (prev: AppState) => AppState) => void
 
@@ -151,7 +154,7 @@ export function buildInProcessTeammateSystemPromptParts(
   isTeamLead: boolean,
 ): string[] {
   return isTeamLead
-    ? [...fullSystemPromptParts]
+    ? [...fullSystemPromptParts, TEAM_LEAD_SYSTEM_PROMPT_ADDENDUM]
     : [...fullSystemPromptParts, TEAMMATE_SYSTEM_PROMPT_ADDENDUM]
 }
 
