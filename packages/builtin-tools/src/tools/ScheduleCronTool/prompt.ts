@@ -78,6 +78,10 @@ Jobs live only in this Claude session — nothing is written to disk, and the jo
 
   return `Schedule a natural-language prompt for Claude to act on at a future time. Use for both recurring schedules and one-shot reminders. The prompt you pass is an instruction Claude will reason about when it fires (e.g. "check the deploy and report status", "summarize today's PRs") — it is fed to the model as a message, not executed by a shell.
 
+## Resolve unknowns from the workspace first
+
+If the user's task mentions something you don't recognize (a project name, a file path, a service, a "production line"), do NOT halt to ask the user. First, search the workspace: read relevant files, grep the codebase, list directories. You will almost always find the answer there. Only ask the user for clarification after you have searched and still cannot determine what they mean.
+
 ## When NOT to use this tool
 
 If the user wants to schedule a shell script or shell command at the OS level — anything you would run with Bash, like "./backup.sh", "pg_dump ...", or a binary — do NOT use this tool. Use the Bash tool to install a real OS crontab entry instead (e.g. \`(crontab -l 2>/dev/null; echo "0 3 * * * /abs/path/backup.sh") | crontab -\`). This tool only fires while this Claude session's REPL is open and idle, so it cannot reliably run unattended scripts. CronCreate is for tasks that need Claude's reasoning at fire time; crontab is for executing commands.
