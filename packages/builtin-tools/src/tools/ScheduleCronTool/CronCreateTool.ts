@@ -31,7 +31,7 @@ const inputSchema = lazySchema(() =>
       .describe(
         'Standard 5-field cron expression in local time: "M H DoM Mon DoW" (e.g. "*/5 * * * *" = every 5 minutes, "30 14 28 2 *" = Feb 28 at 2:30pm local once).',
       ),
-    prompt: z.string().describe('The prompt to enqueue at each fire time.'),
+    prompt: z.string().describe('Natural-language instruction for Claude to act on at each fire time (an agent task, e.g. "check the deploy and report"). NOT a shell command — to schedule scripts/commands use Bash + crontab.'),
     recurring: semanticBoolean(z.boolean().optional()).describe(
       `true (default) = fire on every cron match until deleted or auto-expired after ${DEFAULT_MAX_AGE_DAYS} days. false = fire once at the next match, then auto-delete. Use false for "remind me at X" one-shot requests with pinned minute/hour/dom/month.`,
     ),

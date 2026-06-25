@@ -59,8 +59,8 @@ export const CRON_LIST_TOOL_NAME = 'CronList'
 
 export function buildCronCreateDescription(durableEnabled: boolean): string {
   return durableEnabled
-    ? 'Schedule a prompt to run at a future time — either recurring on a cron schedule, or once at a specific time. Pass durable: true to persist to .claude/scheduled_tasks.json; otherwise session-only.'
-    : 'Schedule a prompt to run at a future time within this Claude session — either recurring on a cron schedule, or once at a specific time.'
+    ? 'Schedule a natural-language prompt for Claude to act on at a future time — either recurring on a cron schedule, or once at a specific time. The prompt is an instruction to Claude (an agent task), NOT a shell command: to schedule a script or shell command at the OS level, use Bash with crontab instead. Pass durable: true to persist to .claude/scheduled_tasks.json; otherwise session-only.'
+    : 'Schedule a natural-language prompt for Claude to act on at a future time within this Claude session — either recurring on a cron schedule, or once at a specific time. The prompt is an instruction to Claude (an agent task), NOT a shell command: to schedule a script or shell command at the OS level, use Bash with crontab instead.'
 }
 
 export function buildCronCreatePrompt(durableEnabled: boolean): string {
@@ -76,7 +76,11 @@ Jobs live only in this Claude session — nothing is written to disk, and the jo
     ? 'Durable jobs persist to .claude/scheduled_tasks.json and survive session restarts — on next launch they resume automatically. One-shot durable tasks that were missed while the REPL was closed are surfaced for catch-up. Session-only jobs die with the process. '
     : ''
 
-  return `Schedule a prompt to be enqueued at a future time. Use for both recurring schedules and one-shot reminders.
+  return `Schedule a natural-language prompt for Claude to act on at a future time. Use for both recurring schedules and one-shot reminders. The prompt you pass is an instruction Claude will reason about when it fires (e.g. "check the deploy and report status", "summarize today's PRs") — it is fed to the model as a message, not executed by a shell.
+
+## When NOT to use this tool
+
+If the user wants to schedule a shell script or shell command at the OS level — anything you would run with Bash, like "./backup.sh", "pg_dump ...", or a binary — do NOT use this tool. Use the Bash tool to install a real OS crontab entry instead (e.g. \`(crontab -l 2>/dev/null; echo "0 3 * * * /abs/path/backup.sh") | crontab -\`). This tool only fires while this Claude session's REPL is open and idle, so it cannot reliably run unattended scripts. CronCreate is for tasks that need Claude's reasoning at fire time; crontab is for executing commands.
 
 Uses standard 5-field cron in the user's local timezone: minute hour day-of-month month day-of-week. "0 9 * * *" means 9am local — no timezone conversion needed.
 
