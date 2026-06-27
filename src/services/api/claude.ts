@@ -1824,6 +1824,7 @@ async function* queryModel(
   let costUSD = 0
   let stopReason: BetaStopReason | null = null
   let didFallBackToNonStreaming = false
+  let streamingFallbackCause: unknown
   let fallbackMessage: AssistantMessage | undefined
   let maxOutputTokens = 0
   let responseHeaders: globalThis.Headers | undefined
@@ -2600,6 +2601,7 @@ async function* queryModel(
         { level: 'error' },
       )
       didFallBackToNonStreaming = true
+      streamingFallbackCause = streamingError
       if (options.onStreamingFallback) {
         options.onStreamingFallback()
       }
@@ -2857,6 +2859,27 @@ async function* queryModel(
         errorModel = errorFromRetry.retryContext.model
       }
 
+      let displayError = error
+      if (
+        didFallBackToNonStreaming &&
+        streamingFallbackCause !== undefined &&
+        error instanceof APIError &&
+        error.status === 404 &&
+        !(
+          streamingFallbackCause instanceof APIError &&
+          streamingFallbackCause.status === 404
+        )
+      ) {
+        displayError = new Error(
+          [
+            'Streaming failed before completion:',
+            errorMessage(streamingFallbackCause),
+            'Non-streaming fallback also failed with HTTP 404:',
+            errorMessage(error),
+          ].join(' '),
+        )
+      }
+
       // Extract quota status from error headers if it's a rate limit error
       if (error instanceof APIError) {
         extractQuotaStatusFromError(error)
@@ -2895,7 +2918,7 @@ async function* queryModel(
         return
       }
 
-      yield getAssistantMessageFromError(error, errorModel, {
+      yield getAssistantMessageFromError(displayError, errorModel, {
         messages,
         messagesForAPI: frozenMessages as unknown as (
           | UserMessage
