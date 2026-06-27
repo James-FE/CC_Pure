@@ -29,7 +29,10 @@ import {
   isNonCustomOpusModel,
 } from 'src/utils/model/model.js'
 import { getModelStrings } from 'src/utils/model/modelStrings.js'
-import { getAPIProvider } from 'src/utils/model/providers.js'
+import {
+  getAPIProvider,
+  isFirstPartyAnthropicBaseUrl,
+} from 'src/utils/model/providers.js'
 import { getIsNonInteractiveSession } from '../../bootstrap/state.js'
 import {
   API_PDF_MAX_PAGES,
@@ -904,6 +907,17 @@ export function getAssistantMessageFromError(
   // For 3P users, suggest a specific fallback model they can try.
   if (error instanceof APIError && error.status === 404) {
     const switchCmd = getIsNonInteractiveSession() ? '--model' : '/model'
+    if (!isFirstPartyAnthropicBaseUrl()) {
+      return createAssistantAPIErrorMessage({
+        content: [
+          `${API_ERROR_MESSAGE_PREFIX} (${model}): Anthropic-compatible endpoint returned HTTP 404:`,
+          formatAPIError(error),
+          'Check the configured base URL/model, or disable non-streaming fallback if the gateway is streaming-only.',
+        ].join(' '),
+        error: 'invalid_request',
+        errorDetails: error.message,
+      })
+    }
     const fallbackSuggestion = get3PModelFallbackSuggestion(model)
     return createAssistantAPIErrorMessage({
       content: fallbackSuggestion
